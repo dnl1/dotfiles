@@ -29,6 +29,6 @@ function git-status() {
   fi
 }
 
-export PROMPT_COMMAND='export PS1="$CYAN[\t]$WHITE 💀  \u ~ \W $(git-status)$ "'
+export PROMPT_COMMAND='export PS1="$CYAN[\t]$WHITE \u ~ \W $(git-status)$ "'
 
 export PATH=/usr/local/bin:/usr/local/sbin:$PATH
