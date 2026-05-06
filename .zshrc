@@ -161,6 +161,10 @@ alias repos="cd ~/work/repos"
 
 eval "$(zoxide init zsh)"
 
+# fzf shell integration (Ctrl+R history, Ctrl+T file finder, Alt+C cd)
+[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ] && source /usr/share/doc/fzf/examples/key-bindings.zsh
+[ -f /usr/share/doc/fzf/examples/completion.zsh ]   && source /usr/share/doc/fzf/examples/completion.zsh
+
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 if (( HAS_PROMPT_TTY )) && [[ -f ~/.p10k.zsh ]]; then
   source ~/.p10k.zsh
