@@ -44,8 +44,16 @@ Then set your terminal emulator's font to **MesloLGS NF**.
 
 ## Install (one-liner)
 
+**Prerequisite:** `curl` — the only thing you need on a fresh machine. `git` is auto-installed by the script if missing.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
+```
+
+If the machine has `wget` instead of `curl`:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
 ```
 
 Clones the repo to `~/.dotfiles` and runs the full bootstrap automatically.
