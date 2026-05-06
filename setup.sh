@@ -214,6 +214,10 @@ do_default_shell() {
   local zsh_bin
   zsh_bin="$(command -v zsh)"
   if [ "$SHELL" = "$zsh_bin" ]; then return 0; fi
+  # chsh requires the shell to be listed in /etc/shells
+  if ! grep -qxF "$zsh_bin" /etc/shells; then
+    echo "$zsh_bin" | sudo tee -a /etc/shells > /dev/null
+  fi
   chsh -s "$zsh_bin"
 }
 

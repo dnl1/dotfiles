@@ -22,4 +22,10 @@ else
   git clone "$REPO" "$DOTFILES"
 fi
 
+if [ ! -f "$DOTFILES/setup.sh" ]; then
+  echo "Error: setup.sh not found in $DOTFILES" >&2
+  exit 1
+fi
+
+chmod +x "$DOTFILES/setup.sh"
 exec "$DOTFILES/setup.sh"
