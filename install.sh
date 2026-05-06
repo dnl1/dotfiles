@@ -10,13 +10,16 @@ set -euo pipefail
 REPO="https://github.com/dnl1/dotfiles.git"
 DOTFILES="$HOME/.dotfiles"
 
-# git is required for cloning; install it if missing (curl is already present
-# since this script is being executed via curl)
-if ! command -v git &>/dev/null; then
-  echo "==> git not found — installing via apt..."
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq git
-fi
+# Ensure both curl and git are available before proceeding.
+# On a fresh Ubuntu, git is often missing; curl is usually present but may not
+# be if the user bootstrapped via wget.
+for pkg in curl git; do
+  if ! command -v "$pkg" &>/dev/null; then
+    echo "==> $pkg not found — installing via apt..."
+    sudo apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq "$pkg"
+  fi
+done
 
 if [ -d "$DOTFILES/.git" ]; then
   echo "==> Updating existing dotfiles at $DOTFILES"
