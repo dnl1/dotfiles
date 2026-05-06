@@ -2,13 +2,54 @@
 
 WSL/Ubuntu dotfiles — zsh + oh-my-zsh + powerlevel10k, tmux, AI coding setup.
 
+## Fonts (required for Powerlevel10k)
+
+Powerlevel10k needs a **Nerd Font** to render icons and prompt symbols correctly.
+Install the font **before** opening the terminal for the first time.
+
+### WSL / Windows Terminal
+
+1. Download the four **MesloLGS NF** font files:
+   - [MesloLGS NF Regular.ttf](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf)
+   - [MesloLGS NF Bold.ttf](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf)
+   - [MesloLGS NF Italic.ttf](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf)
+   - [MesloLGS NF Bold Italic.ttf](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf)
+
+2. Right-click each file → **Install for all users** (or double-click → Install).
+
+3. In **Windows Terminal** → Settings → your Ubuntu profile → Appearance →  
+   set **Font face** to `MesloLGS NF`.
+
+> VS Code users: add `"terminal.integrated.fontFamily": "MesloLGS NF"` to `settings.json`.
+
+### Native Ubuntu (desktop)
+
+```bash
+# Download and install MesloLGS NF
+mkdir -p ~/.local/share/fonts
+curl -fsSL -o ~/.local/share/fonts/"MesloLGS NF Regular.ttf" \
+  "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf"
+curl -fsSL -o ~/.local/share/fonts/"MesloLGS NF Bold.ttf" \
+  "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf"
+curl -fsSL -o ~/.local/share/fonts/"MesloLGS NF Italic.ttf" \
+  "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf"
+curl -fsSL -o ~/.local/share/fonts/"MesloLGS NF Bold Italic.ttf" \
+  "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf"
+fc-cache -fv
+```
+
+Then set your terminal emulator's font to **MesloLGS NF**.
+
+---
+
 ## Install (one-liner)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
 ```
 
-Clones the repo to `~/.dotfiles` and runs the full bootstrap automatically.
+Clones the repo to `~/.dotfiles` and runs the full bootstrap automatically.  
+Safe to re-run — resumes from the last failed step.
 
 ## What gets installed
 
