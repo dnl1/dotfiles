@@ -146,3 +146,25 @@ fi
 if [[ $backed_up_count -gt 0 ]]; then
   echo "Backed up $backed_up_count existing file(s) to: $BACKUP_DIR"
 fi
+
+# ── pre-push hook ─────────────────────────────────────────────────────────────
+HOOK_DIR="$DOTFILES_DIR/.git/hooks"
+HOOK_FILE="$HOOK_DIR/pre-push"
+HOOK_BODY='#!/usr/bin/env bash
+# Syncs safe files to public repo before every push from ~/.dotfiles.
+# Fires automatically for git push, ggpush, IDE, or any other method.
+while IFS= read -r _; do :; done
+"$HOME/.dotfiles/sync-public.sh" || {
+  echo "  [warn] public sync failed — run ~/.dotfiles/sync-public.sh manually" >&2
+}
+exit 0'
+
+if [[ -d "$HOOK_DIR" ]]; then
+  if [[ ! -f "$HOOK_FILE" ]] || ! grep -q "sync-public.sh" "$HOOK_FILE" 2>/dev/null; then
+    printf '%s\n' "$HOOK_BODY" > "$HOOK_FILE"
+    chmod +x "$HOOK_FILE"
+    echo "Installed pre-push hook (auto-syncs public repo on push)."
+  else
+    echo "Skipping pre-push hook (already installed)."
+  fi
+fi
