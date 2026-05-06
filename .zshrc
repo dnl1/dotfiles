@@ -140,15 +140,7 @@ alias ga="git add ."
 alias gc="git commit -m"
 alias gl="git pull"
 
-unalias gp 2>/dev/null
-gp() {
-  git push "$@"
-  local ec=$?
-  if (( ec == 0 )) && [[ "$(git rev-parse --show-toplevel 2>/dev/null)" == "$HOME/.dotfiles" ]]; then
-    "$HOME/.dotfiles/sync-public.sh" || echo "  [warn] public sync failed — run sync-public.sh manually"
-  fi
-  return $ec
-}
+alias gp="git push"
 
 # docker
 alias dps="docker ps"
