@@ -112,6 +112,34 @@ git clone https://github.com/dnl1/dotfiles ~/.dotfiles
 
 > `ggpush` and `ggpull` are provided by the oh-my-zsh `git` plugin. Run `alias \| grep gg` to see all variants.
 
+### Rebase (oh-my-zsh git plugin)
+
+| Command | Expands to | When to use |
+|---------|-----------|-------------|
+| `grb origin/main` | `git rebase origin/main` | Replay your commits on top of latest main |
+| `grb -X theirs origin/main` | `git rebase -X theirs origin/main` | Rebase and auto-resolve conflicts by taking the incoming (remote) side |
+| `grb -X ours origin/main` | `git rebase -X ours origin/main` | Rebase and auto-resolve conflicts by keeping your changes |
+| `grbi HEAD~3` | `git rebase -i HEAD~3` | Interactive rebase — squash, reorder, or edit last 3 commits |
+| `grbm` | `git rebase $(main_branch)` | Rebase onto local main branch |
+| `grbc` | `git rebase --continue` | Continue after resolving a conflict |
+| `grba` | `git rebase --abort` | Abandon the rebase, return to pre-rebase state |
+| `grbs` | `git rebase --skip` | Skip the current conflicting commit and continue |
+
+**Common flow — sync feature branch with main:**
+
+```bash
+gl                        # pull latest on main first
+git checkout feature/xyz
+grb origin/main           # rebase feature on top of main
+# if conflicts:
+#   resolve files, then: git add <file> && grbc
+#   or skip commit:      grbs
+#   or bail out:         grba
+gp --force-with-lease     # push rebased branch (safer than --force)
+```
+
+> `-X theirs` / `-X ours` are **strategy options** for the `ort` merge strategy used during each commit replay — "theirs" means the incoming base commit wins, "ours" means your replayed commit wins. These are the opposite of what you might expect from a merge perspective.
+
 ### Docker
 
 | Command | Expands to | Description |

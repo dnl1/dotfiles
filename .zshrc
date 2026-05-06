@@ -190,6 +190,10 @@ case ":$PATH:" in
 esac
 # pnpm end
 
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
 gprmain() {
   local branch=$(git branch --show-current)
 
