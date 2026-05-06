@@ -156,10 +156,11 @@ alias ls="eza --icons"
 alias ll="eza -lah --icons"
 alias tree="eza --tree --icons"
 
-alias cat="batcat"
+if command -v batcat &>/dev/null; then alias cat="batcat"
+elif command -v bat &>/dev/null; then alias cat="bat"; fi
 alias repos="cd ~/work/repos"
 
-eval "$(zoxide init zsh)"
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
 
 # fzf shell integration (Ctrl+R history, Ctrl+T file finder, Alt+C cd)
 [ -f /usr/share/doc/fzf/examples/key-bindings.zsh ] && source /usr/share/doc/fzf/examples/key-bindings.zsh
