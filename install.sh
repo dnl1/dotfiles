@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # One-liner install — clones dotfiles and runs the full bootstrap.
+# Safe to re-run: resumes from the last failed step automatically.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/master/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
 
 set -euo pipefail
 
