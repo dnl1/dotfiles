@@ -152,9 +152,11 @@ alias ..="cd .."
 alias ...="cd ../.."
 alias ai-team='zsh "$HOME/.dotfiles/ai-team.sh"'
 
-alias ls="eza --icons"
-alias ll="eza -lah --icons"
-alias tree="eza --tree --icons"
+if command -v eza &>/dev/null; then
+  alias ls="eza --icons"
+  alias ll="eza -lah --icons"
+  alias tree="eza --tree --icons"
+fi
 
 if command -v batcat &>/dev/null; then alias cat="batcat"
 elif command -v bat &>/dev/null; then alias cat="bat"; fi

@@ -13,13 +13,15 @@ DOTFILES="$HOME/.dotfiles"
 # Ensure both curl and git are available before proceeding.
 # On a fresh Ubuntu, git is often missing; curl is usually present but may not
 # be if the user bootstrapped via wget.
+_needs_install=()
 for pkg in curl git; do
-  if ! command -v "$pkg" &>/dev/null; then
-    echo "==> $pkg not found — installing via apt..."
-    sudo apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq "$pkg"
-  fi
+  command -v "$pkg" &>/dev/null || _needs_install+=("$pkg")
 done
+if (( ${#_needs_install[@]} )); then
+  echo "==> Installing missing deps: ${_needs_install[*]}"
+  sudo apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq "${_needs_install[@]}"
+fi
 
 if [ -d "$DOTFILES/.git" ]; then
   echo "==> Updating existing dotfiles at $DOTFILES"

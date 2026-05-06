@@ -108,6 +108,11 @@ run_step() {
 
 do_system_packages() {
   DEBIAN_FRONTEND=noninteractive sudo apt-get update -qq
+  # software-properties-common provides add-apt-repository
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq software-properties-common
+  # universe is required for bat and zoxide on minimal Ubuntu installs;
+  # add-apt-repository is idempotent and handles both legacy and DEB822 source formats
+  sudo add-apt-repository -y universe
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
     zsh tmux curl git unzip build-essential \
     bat zoxide fzf ripgrep jq xclip wget gnupg ca-certificates
@@ -211,6 +216,7 @@ do_opencode() {
 
 do_dotfiles() {
   "$DOTFILES_DIR/install-dotfiles.sh" --symlink
+  mkdir -p "$HOME/work/repos"
 }
 
 do_default_shell() {
