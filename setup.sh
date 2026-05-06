@@ -122,7 +122,7 @@ do_eza() {
   if command -v eza &>/dev/null; then return 0; fi
 
   if apt-cache show eza &>/dev/null 2>&1; then
-    sudo apt-get install -y -qq eza
+    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq eza
   else
     local ver arch
     ver="$(curl -fsSL https://api.github.com/repos/eza-community/eza/releases/latest \

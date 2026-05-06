@@ -19,7 +19,7 @@ for pkg in curl git; do
 done
 if (( ${#_needs_install[@]} )); then
   echo "==> Installing missing deps: ${_needs_install[*]}"
-  sudo apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive sudo apt-get update -qq
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq "${_needs_install[@]}"
 fi
 
