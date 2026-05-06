@@ -141,8 +141,8 @@ do_gh_cli() {
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
 https://cli.github.com/packages stable main" \
     | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq gh
+  DEBIAN_FRONTEND=noninteractive sudo apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq gh
 }
 
 do_oh_my_zsh() {
@@ -171,7 +171,10 @@ do_zsh_syntax_highlighting() {
 
 do_nvm() {
   if [ -d "$HOME/.nvm" ]; then return 0; fi
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  local ver
+  ver="$(curl -fsSL https://api.github.com/repos/nvm-sh/nvm/releases/latest \
+    | grep '"tag_name"' | cut -d'"' -f4)"
+  curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${ver}/install.sh" | bash
 }
 
 do_node_lts() {
@@ -189,10 +192,10 @@ do_bun() {
 
 do_go() {
   if [ -d /usr/local/go ]; then return 0; fi
-  local ver="1.24.3"
-  local arch
+  local ver arch
+  ver="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1)"  # e.g. go1.26.2
   arch="$(dpkg --print-architecture)"
-  curl -fsSL "https://go.dev/dl/go${ver}.linux-${arch}.tar.gz" \
+  curl -fsSL "https://go.dev/dl/${ver}.linux-${arch}.tar.gz" \
     | sudo tar -xzf - -C /usr/local
 }
 
@@ -269,3 +272,12 @@ echo -e "    • Run ${BOLD}exec zsh${RESET} or open a new terminal"
 echo -e "    • Run ${BOLD}gh auth login${RESET} to authenticate with GitHub"
 echo -e "    • Run ${BOLD}p10k configure${RESET} to customize your prompt"
 echo
+
+# Warn if git identity is not configured (common on fresh machines)
+if [ -z "$(git config --global user.name 2>/dev/null)" ] || \
+   [ -z "$(git config --global user.email 2>/dev/null)" ]; then
+  echo -e "  ${YELLOW}⚠  Git identity not configured. Run:${RESET}"
+  echo -e "     git config --global user.name  \"Your Name\""
+  echo -e "     git config --global user.email \"you@example.com\""
+  echo
+fi
