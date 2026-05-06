@@ -1,12 +1,22 @@
+# ── Sensitive ─────────────────────────────────────────────────────────────────
 .dotenvs/
 .claude.json
+.zshrc.pre-oh-my-zsh
+
+# ── Shell history & state ──────────────────────────────────────────────────────
 .bash_history
 .zsh_history
-.zcompdump*
+.z
 .lesshst
 .mysql_history
+.python_history
+.sqlite_history
 .viminfo
-.z
+
+# ── System state ───────────────────────────────────────────────────────────────
 .motd_shown
 .sudo_as_admin_successful
-.zshrc.pre-oh-my-zsh
+
+# ── zsh cache ─────────────────────────────────────────────────────────────────
+.zcompdump
+.zcompdump-*
