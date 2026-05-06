@@ -119,11 +119,15 @@ do_eza() {
   if apt-cache show eza &>/dev/null 2>&1; then
     sudo apt-get install -y -qq eza
   else
-    local ver
+    local ver arch
     ver="$(curl -fsSL https://api.github.com/repos/eza-community/eza/releases/latest \
       | grep '"tag_name"' | cut -d'"' -f4)"
+    case "$(dpkg --print-architecture)" in
+      arm64) arch="aarch64" ;;
+      *)     arch="x86_64"  ;;
+    esac
     curl -fsSL \
-      "https://github.com/eza-community/eza/releases/download/${ver}/eza_x86_64-unknown-linux-gnu.tar.gz" \
+      "https://github.com/eza-community/eza/releases/download/${ver}/eza_${arch}-unknown-linux-gnu.tar.gz" \
       | sudo tar -xzf - -C /usr/local/bin eza
   fi
 }
