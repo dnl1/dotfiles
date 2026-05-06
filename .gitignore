@@ -1,0 +1,12 @@
+.dotenvs/
+.claude.json
+.bash_history
+.zsh_history
+.zcompdump*
+.lesshst
+.mysql_history
+.viminfo
+.z
+.motd_shown
+.sudo_as_admin_successful
+.zshrc.pre-oh-my-zsh
