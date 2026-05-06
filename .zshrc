@@ -94,7 +94,6 @@ plugins=(
 git
 zsh-autosuggestions
 zsh-syntax-highlighting
-z
 docker
 npm
 node

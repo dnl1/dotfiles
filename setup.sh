@@ -112,7 +112,7 @@ do_system_packages() {
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq software-properties-common
   # universe is required for bat and zoxide on minimal Ubuntu installs;
   # add-apt-repository is idempotent and handles both legacy and DEB822 source formats
-  sudo add-apt-repository -y universe
+  DEBIAN_FRONTEND=noninteractive sudo add-apt-repository -y universe
   DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq \
     zsh tmux curl git unzip build-essential \
     bat zoxide fzf ripgrep jq xclip wget gnupg ca-certificates
