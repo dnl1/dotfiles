@@ -13,6 +13,10 @@ DOTFILES="$HOME/.dotfiles"
 if [ -d "$DOTFILES/.git" ]; then
   echo "==> Updating existing dotfiles at $DOTFILES"
   git -C "$DOTFILES" pull --ff-only
+elif [ -d "$DOTFILES" ]; then
+  echo "Error: $DOTFILES already exists but is not a git repository." >&2
+  echo "Move or remove it and re-run." >&2
+  exit 1
 else
   echo "==> Cloning dotfiles to $DOTFILES"
   git clone "$REPO" "$DOTFILES"
