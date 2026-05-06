@@ -242,6 +242,13 @@ sudo -v
 SUDO_KEEPER=$!
 trap 'kill $SUDO_KEEPER 2>/dev/null' EXIT
 
+# ── Preflight: curl is required by several steps ──────────────────────────────
+if ! command -v curl &>/dev/null; then
+  echo -e "  ${YELLOW}curl not found — installing...${RESET}"
+  DEBIAN_FRONTEND=noninteractive sudo apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq curl
+fi
+
 print_progress
 
 for step in "${STEPS[@]}"; do
