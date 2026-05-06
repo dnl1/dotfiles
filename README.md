@@ -2,6 +2,8 @@
 
 WSL/Ubuntu dotfiles — zsh + oh-my-zsh + powerlevel10k, tmux, AI coding setup.
 
+---
+
 ## Fonts (required for Powerlevel10k)
 
 Powerlevel10k needs a **Nerd Font** to render icons and prompt symbols correctly.
@@ -17,15 +19,13 @@ Install the font **before** opening the terminal for the first time.
 
 2. Right-click each file → **Install for all users** (or double-click → Install).
 
-3. In **Windows Terminal** → Settings → your Ubuntu profile → Appearance →  
-   set **Font face** to `MesloLGS NF`.
+3. In **Windows Terminal** → Settings → your Ubuntu profile → Appearance → set **Font face** to `MesloLGS NF`.
 
-> VS Code users: add `"terminal.integrated.fontFamily": "MesloLGS NF"` to `settings.json`.
+> **VS Code users:** add `"terminal.integrated.fontFamily": "MesloLGS NF"` to `settings.json`.
 
 ### Native Ubuntu (desktop)
 
 ```bash
-# Download and install MesloLGS NF
 mkdir -p ~/.local/share/fonts
 curl -fsSL -o ~/.local/share/fonts/"MesloLGS NF Regular.ttf" \
   "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf"
@@ -48,57 +48,155 @@ Then set your terminal emulator's font to **MesloLGS NF**.
 curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
 ```
 
-Clones the repo to `~/.dotfiles` and runs the full bootstrap automatically.  
-Safe to re-run — resumes from the last failed step.
+Clones the repo to `~/.dotfiles` and runs the full bootstrap automatically.
+Safe to re-run — resumes automatically from the last failed step.
 
-## What gets installed
+To start over from scratch:
+
+```bash
+~/.dotfiles/setup.sh --reset
+```
+
+### What gets installed
 
 | Tool | Purpose |
 |------|---------|
-| zsh + oh-my-zsh | shell |
-| powerlevel10k | prompt theme |
-| zsh-autosuggestions + zsh-syntax-highlighting | shell plugins |
-| eza, bat, zoxide, fzf, ripgrep | modern CLI replacements |
-| nvm + Node LTS | Node version manager |
-| bun | fast JS runtime / package manager |
+| zsh + oh-my-zsh | Shell and plugin framework |
+| powerlevel10k | Fast, informative prompt theme |
+| zsh-autosuggestions | Fish-like command suggestions as you type |
+| zsh-syntax-highlighting | Colors commands green/red before you run them |
+| eza | Modern `ls` replacement with icons and colors |
+| bat | Modern `cat` replacement with syntax highlighting |
+| zoxide | Smarter `cd` — jump to frecent directories with `z` |
+| fzf | Fuzzy finder for history, files, and more |
+| ripgrep | Faster `grep` alternative |
+| nvm + Node LTS | Node.js version manager |
+| bun | Fast JS runtime and package manager |
 | Go | Go toolchain |
-| pnpm | alternative Node package manager |
-| opencode | AI coding agent |
-| gh | GitHub CLI |
+| pnpm | Efficient Node package manager |
+| opencode | AI coding agent (terminal-based) |
+| gh | GitHub CLI — PRs, issues, repos from the terminal |
 
-## Manual install (dotfiles only)
+### Manual install (dotfiles only)
 
 ```bash
 git clone https://github.com/dnl1/dotfiles ~/.dotfiles
-~/.dotfiles/install-dotfiles.sh --symlink
+~/.dotfiles/install-dotfiles.sh --symlink   # symlink mode (recommended)
+~/.dotfiles/install-dotfiles.sh             # copy mode
 ```
 
-## Files
+---
 
-| File | Purpose |
-|------|---------|
-| `.zshrc` | zsh config — aliases, plugins, PATH, tools |
-| `.p10k.zsh` | Powerlevel10k prompt config |
-| `.gitconfig` | git user config |
-| `.bashrc` / `.profile` | bash fallback config |
-| `ai-team.sh` | tmux layout with N opencode agents + monitor pane |
-| `fix-dns.sh` | auto-fix WSL DNS on shell start |
-| `repair-wsl-network.sh` | full WSL network repair (run with sudo) |
-| `install.sh` | curl one-liner bootstrap |
-| `install-dotfiles.sh` | copy or symlink dotfiles into `$HOME` |
-| `setup.sh` | full machine bootstrap script |
+## Shell aliases and commands
+
+### Git
+
+| Command | Expands to | Description |
+|---------|-----------|-------------|
+| `gs` | `git status` | Working tree status |
+| `ga` | `git add .` | Stage all changes |
+| `gc "msg"` | `git commit -m "msg"` | Commit with message |
+| `gp` | `git push` | Push to remote |
+| `gl` | `git pull` | Pull from remote |
+| `ggpush` | `git push origin <branch>` | Push current branch to origin (oh-my-zsh) |
+| `ggpull` | `git pull origin <branch>` | Pull current branch from origin (oh-my-zsh) |
+| `gprmain` | — | Open a PR against `main` using `gh` (custom function) |
+
+> `ggpush` and `ggpull` are provided by the oh-my-zsh `git` plugin. Run `alias \| grep gg` to see all variants.
+
+### Docker
+
+| Command | Expands to | Description |
+|---------|-----------|-------------|
+| `dps` | `docker ps` | List running containers |
+| `dcu` | `docker compose up -d` | Start services in detached mode |
+| `dcd` | `docker compose down` | Stop and remove services |
+
+### Filesystem
+
+| Command | Expands to | Description |
+|---------|-----------|-------------|
+| `ls` | `eza --icons` | List files with icons |
+| `ll` | `eza -lah --icons` | Long list, all files, human-readable sizes |
+| `tree` | `eza --tree --icons` | Directory tree with icons |
+| `cat` | `batcat` | Syntax-highlighted file viewer |
+| `..` | `cd ..` | Go up one directory |
+| `...` | `cd ../..` | Go up two directories |
+| `z <dir>` | — | Jump to a frecent directory (zoxide) |
+| `repos` | `cd ~/work/repos` | Jump to repos directory |
+
+### AI
+
+| Command | Description |
+|---------|-------------|
+| `ai-team` | Launch tmux AI session (see below) |
+| `opencode` | Open the AI coding agent in the current directory |
+
+### Misc (oh-my-zsh plugins)
+
+| Plugin | What it adds |
+|--------|-------------|
+| `sudo` | Press `Esc` twice to prepend `sudo` to the last command |
+| `extract` | `extract <file>` — extracts any archive format automatically |
+| `history` | `h` to search history; `hs <term>` to grep history |
+| `z` | `z <partial-name>` — jump to frecent directories |
+
+---
 
 ## ai-team
 
-Launches a tmux session with `opencode` agents and a monitor pane.
+Launches a tmux session with N `opencode` AI agents and a monitor pane where you can run shell commands freely.
 
 ```bash
-ai-team           # 1 agent + monitor (default)
-ai-team 2         # 2 agents + monitor
-ai-team 3         # 3 agents + monitor
-ai-team 3 "add auth"  # 3 agents, seeded with a prompt
-ai-team reset     # kill and recreate
-ai-team reset 2   # kill and recreate with 2 agents
+ai-team              # 1 agent (dev) + monitor  ← default
+ai-team 2            # 2 agents (dev + review) + monitor
+ai-team 3            # 3 agents (dev + review + wildcard) + monitor
+ai-team 3 "add auth" # 3 agents, each seeded with the given prompt
+ai-team reset        # kill session and recreate with same agent count
+ai-team reset 2      # kill session and recreate with 2 agents
 ```
 
-Agents: **dev** (engineer) · **review** (code reviewer) · **wildcard** (problem solver)
+**Agent roles:**
+
+| Agent | Role |
+|-------|------|
+| `dev` | Senior backend engineer — implements features |
+| `review` | Strict code reviewer — finds bugs and suggests improvements |
+| `wildcard` | Problem solver — fixes tests, optimizes, debugs |
+
+The session recreates automatically if the agent count changes or the layout version is bumped.
+
+---
+
+## WSL utilities
+
+### fix-dns.sh
+
+Runs automatically on every interactive shell start. Checks if `/etc/resolv.conf` has a nameserver and adds one if missing — prevents DNS failures after WSL restarts.
+
+### repair-wsl-network.sh
+
+Full network repair for WSL — rewrites `/etc/wsl.conf` to enable systemd and proper DNS, then removes the stale `resolv.conf` so Windows regenerates it.
+
+```bash
+sudo ~/.dotfiles/repair-wsl-network.sh
+# then from PowerShell/CMD:
+wsl --shutdown
+```
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `.zshrc` | Main zsh config — plugins, aliases, PATH, tool initialization |
+| `.p10k.zsh` | Powerlevel10k prompt configuration |
+| `.gitconfig` | Git user name and email |
+| `.bashrc` / `.bash_logout` / `.profile` | Bash fallback config |
+| `ai-team.sh` | Parametrized tmux AI session script |
+| `fix-dns.sh` | WSL DNS auto-fix (runs on shell start) |
+| `repair-wsl-network.sh` | Full WSL network repair |
+| `install.sh` | curl one-liner — clones repo and runs setup |
+| `install-dotfiles.sh` | Copies or symlinks dotfiles into `$HOME` with backup |
+| `setup.sh` | Full machine bootstrap with resumable step tracking |
