@@ -44,7 +44,9 @@ Then set your terminal emulator's font to **MesloLGS NF**.
 
 ## Install (one-liner)
 
-**Prerequisite:** `curl` — the only thing you need on a fresh machine. `git` is auto-installed by the script if missing.
+**Prerequisite:** `curl` — the only thing you need on a fresh machine. `git` and `curl` are auto-installed if missing.
+
+> Run **without** `sudo`. The script uses sudo internally only where needed. Running as root breaks installers like nvm, bun, and pnpm.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dnl1/dotfiles/main/install.sh | bash
