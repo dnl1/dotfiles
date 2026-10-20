@@ -180,6 +180,9 @@ export NVM_DIR="$HOME/.nvm"
 export PATH=$HOME/.opencode/bin:$PATH
 export PATH="$HOME/.local/bin:$PATH"
 
+# Shared AI tooling environment, written by ai/bootstrap.sh (codebase-memory-mcp paths)
+[ -f "$HOME/.config/ai/env.sh" ] && . "$HOME/.config/ai/env.sh"
+
 # go
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
