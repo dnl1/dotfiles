@@ -1,0 +1,54 @@
+{
+  "pool": "general",
+  "pools": {
+    "general": {
+      "windowHours": 24,
+      "allocation": "rolling",
+      "fallback": "any",
+      "targets": [
+        { "id": "claude-bridge/claude-opus-5-5", "weight": 5 },
+        { "id": "openai-codex/gpt-6.1-sol", "weight": 4 },
+        { "id": "openai-codex/gpt-5.6-luna", "weight": 4 }
+      ]
+    },
+    "gpt-sol": {
+      "windowHours": 24,
+      "allocation": "rolling",
+      "fallback": "any",
+      "targets": [
+        { "id": "openai-codex/gpt-6.1-sol", "weight": 1 }
+      ]
+    },
+    "claude": {
+      "windowHours": 24,
+      "allocation": "rolling",
+      "fallback": "any",
+      "targets": [
+        { "id": "claude-bridge/claude-opus-5-5", "weight": 1 }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "name": "opus-default",
+      "when": { "trigger": "user" },
+      "then": {
+        "prefer": ["claude-bridge/claude-opus-5-5"],
+        "exclude": ["ollama-local/*"]
+      }
+    }
+  ],
+  "failover": {
+    "maxAttempts": 3
+  },
+  "pricing": {
+    "overrides": {
+      "claude-bridge/claude-opus-5-5": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      }
+    }
+  }
+}
