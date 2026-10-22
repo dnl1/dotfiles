@@ -162,6 +162,22 @@ def configure(cfg):
         overrides[model_key] = override
         write_json(settings_path, settings)
 
+    # Devstral is local and slow, so automatic routing only prefers it for turns
+    # started by extensions. It is a preference, not a restriction: with the
+    # server off, those turns fail over to the cloud models.
+    auto_path = HOME / ".pi/agent/auto-model.json"
+    auto = read_json(auto_path, {})
+    scenarios = auto.setdefault("scenarios", {})
+    prices = auto.setdefault("pricing", {}).setdefault("overrides", {})
+    background = {"prefer": [model_key]}
+    free = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+    if scenarios.get("background") != background or prices.get(model_key) != free:
+        if auto_path.exists():
+            shutil.copy2(auto_path, auto_path.with_name(f"auto-model.json.bak-{time.time_ns()}"))
+        scenarios["background"] = background
+        prices[model_key] = free
+        write_json(auto_path, auto)
+
 
 def start_server(cfg):
     # An existing Ollama instance may be handling other work.

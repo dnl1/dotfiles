@@ -37,6 +37,13 @@ Use `/auto-model status` to inspect it, or `/auto-model off` and select a
 concrete model to keep a session fixed. Log in to each provider on that machine;
 credentials and routing history are not synced.
 
+The pool lives in `pi/auto-model.json`. Your prompts go to Opus 5.5 first, and
+Luna 5.6 and Sol 6.1 take over when it fails. `/auto-model pool gpt-sol` keeps a
+session on Sol, `/auto-model pool claude` on Opus, and `/auto-model pool general`
+restores the mix. The Claude subscription is still picked with `/conta trabalho`
+or `/conta pessoal`. The local Devstral never answers your prompts; on the Mac it
+is only preferred for turns started by extensions (see below).
+
 ## ai-memory — memory across sessions
 
 One authenticated loopback server runs on each machine at
@@ -208,6 +215,9 @@ Payloads above about 75 KB are refused.
 
 `llm-mode` runs Devstral Small 2 locally without changing the model used by
 ordinary pi sessions. Use it from a Mac pane in herdr or a terminal on the Mac.
+In automatic routing, `configure` also makes Devstral the preferred model for
+turns started by extensions, never for your prompts; while its server is off,
+those turns fail over to the cloud models.
 
 First setup (about 15 GB of model downloads):
 

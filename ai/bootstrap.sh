@@ -469,8 +469,10 @@ fi
 # AGENTS.md and pi/extensions/*.ts are SYMLINKED into ~/.pi/agent, so an edit
 # made from a pi session lands in this repo: commit and push it and the other
 # machine has it after its next sync (sync.sh pauses while it is uncommitted).
-# settings.json and claude-bridge.json are merged instead, like the Claude
-# settings, because pi writes its own state into them. extensions/rtk.ts comes
+# settings.json, claude-bridge.json and auto-model.json are merged instead,
+# like the Claude settings, because pi writes its own state into them
+# (/auto-model policy rewrites auto-model.json). llm-mode adds the local Devstral
+# entries to auto-model.json on the Mac. extensions/rtk.ts comes
 # from `rtk init --agent pi`; herdr-agent-state.ts belongs to herdr.
 
 step "pi"
@@ -517,7 +519,8 @@ def merge(dst, src):
             dst[key] = value
     return dst
 
-for layer, target in (("settings.base.json", "settings.json"), ("claude-bridge.json", "claude-bridge.json")):
+for layer, target in (("settings.base.json", "settings.json"), ("claude-bridge.json", "claude-bridge.json"),
+                      ("auto-model.json", "auto-model.json")):
     path = os.path.join(pi_dir, target)
     current = json.load(open(path)) if os.path.exists(path) else {}
     merged = merge(json.loads(json.dumps(current)), json.load(open(os.path.join(layer_dir, layer))))

@@ -63,6 +63,11 @@ class ModeTests(unittest.TestCase):
         m.write_json(settings_path, {"defaultProvider": "claude-bridge", "compaction": {
             "reserveTokens": 12000, "modelOverrides": {"other/model": {"reserveTokens": 1000}},
         }})
+        auto_path = self.home / ".pi/agent/auto-model.json"
+        opus = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+        rules = [{"name": "opus-default", "when": {"trigger": "user"}, "then": {"exclude": ["ollama-local/*"]}}]
+        m.write_json(auto_path, {"pool": "general", "rules": rules,
+                                 "pricing": {"overrides": {"claude-bridge/claude-opus-5-5": opus}}})
         m.configure(self.cfg)
         definition = plistlib.loads(m.PLIST.read_bytes())
         env = definition["EnvironmentVariables"]
@@ -85,10 +90,19 @@ class ModeTests(unittest.TestCase):
         self.assertEqual(settings["compaction"]["modelOverrides"]["ollama-local/devstral-local"], {
             "reserveTokens": 4096, "keepRecentTokens": 4096,
         })
+        auto = m.read_json(auto_path, {})
+        self.assertEqual(auto["pool"], "general")
+        self.assertEqual(auto["rules"], rules)
+        self.assertEqual(auto["scenarios"], {"background": {"prefer": ["ollama-local/devstral-local"]}})
+        self.assertEqual(auto["pricing"]["overrides"]["claude-bridge/claude-opus-5-5"], opus)
+        self.assertEqual(auto["pricing"]["overrides"]["ollama-local/devstral-local"], opus)
         before = path.read_bytes()
+        auto_before = auto_path.read_bytes()
         m.configure(self.cfg)
         self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(auto_path.read_bytes(), auto_before)
         self.assertEqual(len(list(path.parent.glob("models.json.bak-*"))), 1)
+        self.assertEqual(len(list(path.parent.glob("auto-model.json.bak-*"))), 1)
 
     @patch.object(m, "service_loaded", return_value=False)
     @patch.object(m, "server_alive", return_value=True)
