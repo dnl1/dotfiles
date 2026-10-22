@@ -1,0 +1,19 @@
+{
+  "deepwiki": {
+    "type": "http",
+    "url": "https://mcp.deepwiki.com/mcp"
+  },
+  "playwright": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@playwright/mcp@0.0.83",
+      "--browser",
+      "chromium"
+    ]
+  },
+  "codebase-memory-mcp": {
+    "_check": "[ -x \"$HOME/.local/bin/codebase-memory-mcp\" ]",
+    "command": "__HOME__/.local/bin/codebase-memory-mcp"
+  }
+}

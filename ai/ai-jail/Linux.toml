@@ -1,0 +1,37 @@
+# ai-jail-managed: rendered by ai/bootstrap.sh from ai/ai-jail/Linux.toml in
+# the private dotfiles — edit it there and re-run, or delete this line to keep
+# local edits (bootstrap then leaves the file alone).
+#
+# Accident prevention, not a security boundary. What the agent can reach:
+#   project dir (rw), Claude state, gh + ssh (to push/open PRs), network,
+#   ai-memory, Node/npx and uv, ~/.config/ai-mcp (read-only).
+# Deliberately NOT mapped: ~/.aws (the AWS MCPs use the separate read-only
+# credentials in ~/.config/ai-mcp/aws) and the rest of $HOME.
+# codebase-memory-mcp: its index cache and daemon rendezvous are relocated
+# (CBM_CACHE_DIR / CBM_RUNTIME_DIR, see settings.Linux.json) to ~/.local/state/codebase-memory-mcp,
+# mapped read-write below, so jailed and unjailed sessions share one daemon
+# and one index.
+# Validated on WSL2 (Ubuntu 24.04, kernel 6.18, bubblewrap 0.9.0) on 2026-10-05:
+# every MCP connects, Claude is logged in, one shared CBM daemon.
+
+no_save_config = true
+__ENV_FROM_FILE__
+
+[commands.claude]
+network = true
+worktree = true
+github = true
+ssh = true
+ro_maps = [
+  "__HOME__/.local/opt/ai-memory",
+  "__HOME__/.config/ai-memory",
+  "__HOME__/.local/bin",
+  "__HOME__/.nvm",
+  "__HOME__/.config/ai-mcp",
+  "__HOME__/.cache/ms-playwright",
+]
+rw_maps = [
+  "__HOME__/.local/state/codebase-memory-mcp",
+  "__HOME__/.local/share/ai-memory",
+  "__HOME__/.local/share/uv",
+]

@@ -1,0 +1,17 @@
+prSections:
+  - title: Open PRs
+    filters: is:open
+  - title: Mine
+    filters: is:open author:@me
+  - title: Review requested
+    filters: is:open review-requested:@me
+
+defaults:
+  view: prs
+
+smartFilteringAtLaunch: true
+
+keybindings:
+  universal:
+    - key: esc
+      builtin: quit

@@ -1,0 +1,53 @@
+onboarding = false
+
+[ui.toast]
+delivery = "herdr"
+
+[theme]
+name = "catppuccin"
+auto_switch = false
+
+[[keys.command]]
+key = "prefix+ctrl+g"
+type = "popup"
+description = "lazygit (popup)"
+command = "cd \"$(herdr pane get \"$HERDR_ACTIVE_PANE_ID\" | jq -r .result.pane.foreground_cwd)\" 2>/dev/null; exec lazygit"
+width = "85%"
+height = "92%"
+
+[[keys.command]]
+key = "prefix+ctrl+p"
+type = "popup"
+description = "Repository PRs (gh-dash)"
+command = '''
+fail() {
+  printf '\n  PR popup: %s\n  Press Enter to close.\n' "$1" >&2
+  [ -t 0 ] && read -r _
+  exit 1
+}
+pane=$(herdr pane get "$HERDR_ACTIVE_PANE_ID") || fail "herdr could not read the focused pane."
+cwd=$(printf '%s' "$pane" | jq -er '.result.pane.foreground_cwd // .result.pane.cwd') || fail "the focused pane has no working directory."
+cd "$cwd" || fail "cannot enter $cwd."
+unset GH_REPO
+config="${XDG_CONFIG_HOME:-$HOME/.config}/gh-dash/config.yml"
+if repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) && test -n "$repo"; then
+  export GH_REPO="$repo"
+  exec gh dash --config "$config"
+fi
+# A folder that only groups clones (a workspace): the PRs of every one of them,
+# through a copy of the config whose filters name each repository.
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/herdr"
+mkdir -p "$cache" && : > "$cache/pr-popup.repos" || fail "cannot write to $cache."
+for dir in */; do
+  [ -e "$dir.git" ] || continue
+  (cd "$dir" && gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null >> "$cache/pr-popup.repos") &
+done
+wait
+repos=$(sort -u "$cache/pr-popup.repos" | sed 's/^/repo:/' | tr '\n' ' ')
+test -n "$repos" || fail "$cwd is not a GitHub repository, nor a folder of them."
+sed -E "s|^([[:space:]]*filters:[[:space:]]*)([\"']?)|\1\2$repos|" "$config" > "$cache/pr-popup.yml" \
+  || fail "cannot read $config."
+exec gh dash --config "$cache/pr-popup.yml"
+'''
+width = "85%"
+height = "92%"

@@ -151,20 +151,33 @@ fi
 HOOK_DIR="$DOTFILES_DIR/.git/hooks"
 HOOK_FILE="$HOOK_DIR/pre-push"
 HOOK_BODY='#!/usr/bin/env bash
-# Syncs safe files to public repo before every push from ~/.dotfiles.
-# Fires automatically for git push, ggpush, IDE, or any other method.
+# dotfiles-managed: pre-push
+# Syncs safe files to the public repo before a push.
 while IFS= read -r _; do :; done
-"$HOME/.dotfiles/sync-public.sh" || {
-  echo "  [warn] public sync failed — run ~/.dotfiles/sync-public.sh manually" >&2
+DOTFILES_DIR="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "  [warn] cannot locate dotfiles checkout; public sync skipped" >&2
+  exit 0
+}
+SYNC_SCRIPT="$DOTFILES_DIR/sync-public.sh"
+"$SYNC_SCRIPT" || {
+  printf "  [warn] public sync failed; run %q manually\n" "$SYNC_SCRIPT" >&2
 }
 exit 0'
 
-if [[ -d "$HOOK_DIR" ]]; then
-  if [[ ! -f "$HOOK_FILE" ]] || ! grep -q "sync-public.sh" "$HOOK_FILE" 2>/dev/null; then
+# Only the private checkout has sync-public.sh; a clone of the public repo has
+# nothing to sync, and the hook would warn on every push.
+if [[ -d "$HOOK_DIR" ]] && [[ ! -f "$DOTFILES_DIR/sync-public.sh" ]]; then
+  echo "Skipping pre-push hook (no sync-public.sh: public clone)."
+elif [[ -d "$HOOK_DIR" ]]; then
+  if [[ -f "$HOOK_FILE" ]] &&
+     ! grep -Fqx '# dotfiles-managed: pre-push' "$HOOK_FILE" &&
+     ! grep -Fqx '# Syncs safe files to public repo before every push from ~/.dotfiles.' "$HOOK_FILE"; then
+    echo "Skipping pre-push hook (custom hook exists)."
+  elif [[ -f "$HOOK_FILE" ]] && [[ "$(< "$HOOK_FILE")" == "$HOOK_BODY" ]]; then
+    echo "Skipping pre-push hook (already installed)."
+  else
     printf '%s\n' "$HOOK_BODY" > "$HOOK_FILE"
     chmod +x "$HOOK_FILE"
     echo "Installed pre-push hook (auto-syncs public repo on push)."
-  else
-    echo "Skipping pre-push hook (already installed)."
   fi
 fi

@@ -1,0 +1,18 @@
+{
+  "defaultProvider": "claude-bridge",
+  "defaultModel": "claude-opus-5-5",
+  "defaultThinkingLevel": "xhigh",
+  "packages": [
+    {
+      "source": "npm:pi-claude-bridge@0.9.3",
+      "extensions": []
+    },
+    "npm:pi-codex-native@0.3.13",
+    "git:github.com/stark-contrast/stark-ai-plugin@e93b5587e6085d2d07cf222713622068c7f5142a",
+    "npm:pi-auto-model@0.9.1"
+  ],
+  "skills": [
+    "~/.claude/skills",
+    "~/.claude/plugins/marketplaces/humanizer"
+  ]
+}

@@ -1,6 +1,39 @@
 # dotfiles
 
-WSL/Ubuntu dotfiles — zsh + oh-my-zsh + powerlevel10k, tmux, AI coding setup.
+WSL/Ubuntu shell dotfiles, plus the AI coding setup I use on macOS and WSL:
+[pi.dev](https://pi.dev) inside [herdr](https://herdr.dev), with ai-memory,
+rtk, codebase-memory-mcp, MCP tools and shared skills.
+
+## Pi + herdr
+
+The shell installer below is for WSL/Ubuntu. The AI setup is a separate step
+that also supports macOS. It needs Claude Code (authenticated), Node/npm,
+Python 3, jq, curl and git; macOS also needs Homebrew. See
+[prerequisites and setup](ai/README.md) before running it.
+
+```bash
+# After cloning this repo (or using the shell installer below):
+~/.dotfiles/ai/bootstrap.sh
+
+# Then, in a repository:
+herdr
+pi     # run inside a herdr pane
+```
+
+The bootstrap installs pi, herdr and its agent integrations, ai-memory,
+codebase-memory-mcp, rtk, uv and Playwright Chromium. It also configures the
+Claude bridge, Codex subscription access, `pi-auto-model`, Humanizer, Stark,
+status lines, quota fallback, clipboard support and Git/PR popups.
+Use `gh auth login` for PRs; install lazygit separately for the Git popup.
+Provider and MCP logins are per machine.
+
+The configured base model is Claude Opus 5.5 at `xhigh`; automatic routing is
+also enabled for new Pi sessions. Use `/auto-model off` and choose a concrete
+model if you want to keep it fixed. State, OAuth tokens and sessions stay local.
+Employer-specific settings are excluded from the public repo, and public
+clones do not enable unattended auto-sync unless you opt in.
+
+[Daily usage](ai/USAGE.md) · [Configuration and updates](ai/README.md)
 
 ---
 
@@ -167,7 +200,8 @@ gp --force-with-lease     # push rebased branch (safer than --force)
 
 | Command | Description |
 |---------|-------------|
-| `ai-team` | Launch tmux AI session (see below) |
+| `herdr` / `pi` | Terminal workspace and coding agent (see Pi + herdr above) |
+| `ai-team` | Older OpenCode/tmux workflow (see below) |
 | `opencode` | Open the AI coding agent in the current directory |
 
 ### Misc (oh-my-zsh plugins)
@@ -232,6 +266,9 @@ wsl --shutdown
 | `.p10k.zsh` | Powerlevel10k prompt configuration |
 | `.gitconfig` | Git user name and email |
 | `.bashrc` / `.bash_logout` / `.profile` | Bash fallback config |
+| `ai/` | Pi/herdr setup, shared skills, MCP configuration and bootstrap |
+| `.tmux.conf` | tmux plugins and worktree workflow |
+| `tests/` | Offline bootstrap, integration and sync checks |
 | `ai-team.sh` | Parametrized tmux AI session script |
 | `fix-dns.sh` | WSL DNS auto-fix (runs on shell start) |
 | `repair-wsl-network.sh` | Full WSL network repair |

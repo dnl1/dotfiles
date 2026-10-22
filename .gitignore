@@ -20,3 +20,7 @@
 # ── zsh cache ─────────────────────────────────────────────────────────────────
 .zcompdump
 .zcompdump-*
+
+# Python test caches
+__pycache__/
+*.py[cod]

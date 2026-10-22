@@ -1,0 +1,11 @@
+{
+  "source_model": "devstral-small-2:24b",
+  "model": "devstral-local",
+  "context": 16384,
+  "max_output": 4096,
+  "close_apps": [
+    "com.brave.Browser",
+    "com.hnc.Discord",
+    "com.tinyspeck.slackmacgap"
+  ]
+}

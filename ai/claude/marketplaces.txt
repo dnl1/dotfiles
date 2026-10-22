@@ -1,0 +1,6 @@
+# Third-party Claude Code plugin marketplaces added by ai/bootstrap.sh before
+# the plugins in plugins.txt are installed. One GitHub `owner/repo` per line;
+# blank lines and # comments are ignored. The official marketplace is built in.
+
+# Humanizer: rewrites AI-sounding prose (plugin humanizer@humanizer).
+blader/humanizer
