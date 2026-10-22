@@ -1,0 +1,6 @@
+{
+  "env": {
+    "CBM_CACHE_DIR": "/opt/homebrew/var/codebase-memory-mcp/cache",
+    "CBM_RUNTIME_DIR": "/opt/homebrew/var/codebase-memory-mcp/run"
+  }
+}

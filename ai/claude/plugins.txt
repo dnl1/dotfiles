@@ -1,0 +1,28 @@
+# Claude Code plugins installed at user scope by ai/bootstrap.sh.
+# One `plugin@marketplace` per line; blank lines and # comments are ignored.
+
+# Type-aware go-to-definition, references and diagnostics (needs typescript-language-server).
+typescript-lsp@claude-plugins-official
+# Version-specific library docs (hosted Context7 MCP).
+context7@claude-plugins-official
+# Live Chrome: console, network, performance traces.
+chrome-devtools-mcp@claude-plugins-official
+# Playwright is a plain MCP entry (mcp-servers.json) pinned to Chromium, so the
+# Mac and WSL run the same browser; a leading '-' uninstalls the plugin.
+-playwright@claude-plugins-official
+# Audit and revise CLAUDE.md files.
+claude-md-management@claude-plugins-official
+# Brainstorm → plan → subagent-driven TDD with review between steps.
+superpowers@claude-plugins-official
+# Pattern warnings on edits + LLM security review on Stop (costs tokens).
+security-guidance@claude-plugins-official
+# Rewrites AI-sounding prose (/humanizer:humanizer); marketplace in marketplaces.txt.
+humanizer@humanizer
+# Visual design guidance for new UI (/frontend-design). Installed on both
+# machines from Claude's plugin directory, which is what the id's suffix names;
+# installing it fresh through `claude plugin install` has not been tried.
+frontend-design@anthropic-plugin-directory
+# Accessibility (WCAG) skills for front-end, back-end, mobile, design and PM,
+# backed by the Stark MCP (OAuth, sign in once per machine with /mcp). pi gets
+# the same skills and MCP from pi/settings.base.json and pi/mcp.json.
+stark@anthropic-plugin-directory

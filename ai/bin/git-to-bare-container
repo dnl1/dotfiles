@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# git-to-bare-container SRC DST
+#
+# Converts an ordinary checkout SRC (whose .git is a directory) into the
+# bare-repo container layout, IN PLACE, losing nothing:
+#
+#   DST/.bare      the old SRC/.git, now core.bare = true (objects, refs,
+#                  stashes, reflogs, config, hooks — all kept)
+#   DST/.git       "gitdir: ./.bare"
+#   DST/main/      the old SRC working tree, registered as a linked worktree,
+#                  with its index, HEAD, reflog and every untracked/ignored file
+#                  (.env, node_modules, …) as they were
+#   SRC            left as a symlink to DST/main, so old paths keep working
+#
+# Linked worktrees (inside SRC or anywhere else) are re-pointed with
+# `git worktree repair`. State is checksummed before and after; any difference
+# aborts with the evidence. A fresh `git clone --bare` would instead drop stashes,
+# local-only branches and every uncommitted change.
+# Needs GNU realpath (-m) and bash 4+ (mapfile): fine on Linux; on macOS install
+# coreutils and a newer bash first.
+set -euo pipefail
+
+die() { echo "git-to-bare-container: $*" >&2; exit 1; }
+[ $# -eq 2 ] || die "usage: git-to-bare-container SRC DST"
+SRC=$(realpath -- "$1")
+DST=$(realpath -m -- "$2")
+
+[ -d "$SRC/.git" ] || die "$SRC/.git is not a directory — SRC must be a main (non-linked) checkout"
+[ ! -e "$DST" ] || die "$DST already exists"
+[ "$(git -C "$SRC" rev-parse --is-bare-repository)" = false ] || die "$SRC is already bare"
+[ -z "$(git -C "$SRC" config --get core.worktree || true)" ] || die "core.worktree is set; refusing"
+[ ! -e "$SRC/.git/worktrees/main" ] || die "a linked worktree named 'main' already exists"
+for f in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply BISECT_LOG; do
+  [ ! -e "$SRC/.git/$f" ] || die "an operation is in progress in $SRC ($f) — finish or abort it first"
+done
+
+state() {  # checksum of everything that must survive, per worktree
+  # Worktrees are compared by content (HEAD + full status), not by path: main/
+  # changes name, and the bare repo itself is listed after the conversion.
+  local repo=$1
+  git -C "$repo" for-each-ref --format='%(refname) %(objectname)' | sha256sum | cut -c1-16
+  git -C "$repo" stash list --format='%H' | sha256sum | cut -c1-16
+  git -C "$repo" worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
+    [ "$(git -C "$wt" rev-parse --is-bare-repository 2>/dev/null)" = true ] && continue
+    printf '%s %s\n' \
+      "$(git -C "$wt" rev-parse HEAD 2>/dev/null)" \
+      "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null | sha256sum | cut -c1-16)"
+  done | sort
+}
+
+mapfile -t LINKED < <(git -C "$SRC" worktree list --porcelain | awk '/^worktree /{print $2}' | tail -n +2)
+BEFORE=$(state "$SRC")
+
+mkdir -p "$(dirname "$DST")"
+mkdir "$DST"
+mv "$SRC" "$DST/main"
+ln -s "$DST/main" "$SRC"
+
+B=$DST/.bare
+mv "$DST/main/.git" "$B"
+W=$B/worktrees/main
+mkdir -p "$W/logs"
+mv "$B/index" "$W/index"
+cp "$B/HEAD" "$W/HEAD"
+[ -f "$B/logs/HEAD" ] && mv "$B/logs/HEAD" "$W/logs/HEAD"
+[ -f "$B/ORIG_HEAD" ] && mv "$B/ORIG_HEAD" "$W/ORIG_HEAD"
+echo "../.." > "$W/commondir"
+echo "$DST/main/.git" > "$W/gitdir"
+echo "gitdir: $W" > "$DST/main/.git"
+git --git-dir="$B" config core.bare true
+if git --git-dir="$B" show-ref --verify --quiet refs/heads/main; then
+  git --git-dir="$B" symbolic-ref HEAD refs/heads/main
+fi
+echo "gitdir: ./.bare" > "$DST/.git"
+
+# Linked worktrees that lived inside SRC moved with it; the rest stayed put.
+REPAIR=("$DST/main")
+for wt in "${LINKED[@]}"; do
+  case "$wt" in "$SRC"/*) REPAIR+=("$DST/main/${wt#"$SRC"/}") ;; *) REPAIR+=("$wt") ;; esac
+done
+git -C "$DST" worktree repair "${REPAIR[@]}"
+
+AFTER=$(state "$DST/main")
+if [ "$BEFORE" != "$AFTER" ]; then
+  echo "STATE CHANGED — nothing was deleted; inspect before going on:" >&2
+  diff <(echo "$BEFORE") <(echo "$AFTER") >&2 || true
+  exit 1
+fi
+echo "converted: $DST (main/ + ${#LINKED[@]} linked worktree(s)); $SRC -> $DST/main"

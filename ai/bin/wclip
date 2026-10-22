@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Copy stdin, or the given files, to the clipboard of the terminal being viewed,
+# through OSC 52. Inside herdr attached from Windows, that is the Windows clipboard.
+#   git diff | wclip      wclip notes.txt
+# Without a controlling terminal (an agent's shell), it writes to the terminal of the
+# nearest ancestor process that has one, which is the pane the agent runs in.
+set -euo pipefail
+
+# Same limit pi uses for OSC 52; terminals may drop larger payloads.
+MAX_ENCODED=100000
+
+encoded=$(cat -- "$@" | base64 | tr -d '\n')
+if [ -z "$encoded" ]; then
+  echo "wclip: nothing to copy" >&2
+  exit 1
+fi
+if [ "${#encoded}" -gt "$MAX_ENCODED" ]; then
+  echo "wclip: text too large for OSC 52 (${#encoded} of $MAX_ENCODED base64 characters)" >&2
+  exit 1
+fi
+
+target=
+if { : >/dev/tty; } 2>/dev/null; then
+  target=/dev/tty
+else
+  pid=$PPID
+  while [ "${pid:-0}" -gt 1 ]; do
+    tty=$(ps -o tty= -p "$pid" 2>/dev/null | tr -d ' ')
+    case "$tty" in
+      ''|'?'|'??') ;;
+      *) target=/dev/$tty; break ;;
+    esac
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+  done
+fi
+if [ -z "$target" ] || [ ! -w "$target" ]; then
+  echo "wclip: no terminal to write to" >&2
+  exit 1
+fi
+
+printf '\033]52;c;%s\a' "$encoded" >"$target"
+# The terminal does not acknowledge OSC 52, so this only confirms the write.
+echo "wclip: sent to $target" >&2

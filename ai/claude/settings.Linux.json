@@ -1,0 +1,7 @@
+{
+  "autoMemoryEnabled": false,
+  "env": {
+    "CBM_CACHE_DIR": "__HOME__/.local/state/codebase-memory-mcp/cache",
+    "CBM_RUNTIME_DIR": "__HOME__/.local/state/codebase-memory-mcp/run"
+  }
+}

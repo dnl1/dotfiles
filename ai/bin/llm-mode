@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""Local coding mode on macOS, with app recovery when leaving the mode."""
+
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.error import URLError
+from urllib.request import ProxyHandler, Request, build_opener
+
+HOME = Path.home()
+CONFIG = HOME / ".config/ai/llm-mode.json"
+STATE_DIR = HOME / ".local/state/llm-mode"
+STATE = STATE_DIR / "session.json"
+LABEL = "com.dnl1.ollama-local"
+DOMAIN = f"gui/{os.getuid()}"
+PLIST = HOME / "Library/LaunchAgents" / f"{LABEL}.plist"
+BASE_URL = "http://127.0.0.1:11434"
+PROVIDER = "ollama-local"
+DEFAULTS = {
+    "source_model": "devstral-small-2:24b",
+    "model": "devstral-local",
+    "context": 16384,
+    "max_output": 4096,
+    "close_apps": ["com.brave.Browser", "com.hnc.Discord", "com.tinyspeck.slackmacgap"],
+}
+ALLOWED_APPS = frozenset(DEFAULTS["close_apps"])
+APPS_JS = """ObjC.import('AppKit');
+JSON.stringify($.NSWorkspace.sharedWorkspace.runningApplications.js
+.filter(a => a.bundleIdentifier && Number(a.activationPolicy) === 0)
+.map(a => ({id:ObjC.unwrap(a.bundleIdentifier), name:ObjC.unwrap(a.localizedName),
+           pid:Number(a.processIdentifier)})))"""
+QUIT_JS = """function run(argv) {
+ObjC.import('AppKit');
+const ids = JSON.parse(argv[0]);
+$.NSWorkspace.sharedWorkspace.runningApplications.js.forEach(a => {
+  if (a.bundleIdentifier && ids.includes(ObjC.unwrap(a.bundleIdentifier))) a.terminate;
+});
+}"""
+
+
+def run(args, **kwargs):
+    return subprocess.run(args, check=True, **kwargs)
+
+
+def read_json(path, default):
+    return json.loads(path.read_text()) if path.exists() else default
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as temp:
+        json.dump(data, temp, indent=2, ensure_ascii=False)
+        temp.write("\n")
+    os.replace(temp.name, path)
+
+
+def config():
+    value = {**DEFAULTS, **read_json(CONFIG, {})}
+    if not isinstance(value["context"], int) or not 8192 <= value["context"] <= 32768:
+        raise RuntimeError("context must be between 8192 and 32768 tokens.")
+    if not isinstance(value["max_output"], int) or not 0 < value["max_output"] < value["context"]:
+        raise RuntimeError("max_output must be positive and smaller than context.")
+    if set(value["close_apps"]) - ALLOWED_APPS:
+        raise RuntimeError("The quit list only allows Brave, Discord, and Slack.")
+    for field in ("model", "source_model"):
+        if not isinstance(value[field], str) or not value[field] or any(c.isspace() for c in value[field]):
+            raise RuntimeError(f"Invalid model name: {field}.")
+    return value
+
+
+def api(path, data=None, timeout=10):
+    body = json.dumps(data).encode() if data is not None else None
+    request = Request(BASE_URL + path, data=body, headers={"Content-Type": "application/json"})
+    with build_opener(ProxyHandler({})).open(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def server_alive():
+    try:
+        return bool(api("/api/version", timeout=2).get("version"))
+    except (URLError, TimeoutError, OSError):
+        return False
+
+
+def service_loaded():
+    return subprocess.run(["launchctl", "print", f"{DOMAIN}/{LABEL}"],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def configure(cfg):
+    ollama = shutil.which("ollama")
+    if not ollama:
+        raise RuntimeError("Ollama is not installed. Run brew install ollama.")
+    logs = HOME / "Library/Logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    definition = {
+        "Label": LABEL,
+        "ProgramArguments": [ollama, "serve"],
+        "RunAtLoad": False,
+        "EnvironmentVariables": {
+            "PATH": f"{HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "OLLAMA_HOST": "127.0.0.1:11434",
+            "OLLAMA_NO_CLOUD": "1",
+            "OLLAMA_NUM_PARALLEL": "1",
+            "OLLAMA_MAX_LOADED_MODELS": "1",
+            "OLLAMA_CONTEXT_LENGTH": str(cfg["context"]),
+            "OLLAMA_KEEP_ALIVE": "5m",
+            "OLLAMA_FLASH_ATTENTION": "1",
+            "OLLAMA_KV_CACHE_TYPE": "q8_0",
+        },
+        "StandardOutPath": str(logs / "ollama-local.log"),
+        "StandardErrorPath": str(logs / "ollama-local.log"),
+    }
+    PLIST.parent.mkdir(parents=True, exist_ok=True)
+    encoded = plistlib.dumps(definition)
+    if not PLIST.exists() or PLIST.read_bytes() != encoded:
+        if service_loaded():
+            raise RuntimeError("The service configuration has changed. Run llm-mode off before configure.")
+        PLIST.write_bytes(encoded)
+
+    models_path = HOME / ".pi/agent/models.json"
+    models = read_json(models_path, {})
+    provider = {
+        "baseUrl": BASE_URL + "/v1",
+        "api": "openai-completions",
+        "apiKey": "ollama-local",
+        "models": [{
+            "id": cfg["model"],
+            "name": "Devstral Small 2 (local)",
+            "reasoning": False,
+            "input": ["text"],
+            "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+            "contextWindow": cfg["context"],
+            "maxTokens": cfg["max_output"],
+        }],
+    }
+    providers = models.setdefault("providers", {})
+    if providers.get(PROVIDER) != provider:
+        if models_path.exists():
+            shutil.copy2(models_path, models_path.with_name(f"models.json.bak-{time.time_ns()}"))
+        providers[PROVIDER] = provider
+        write_json(models_path, models)
+
+    settings_path = HOME / ".pi/agent/settings.json"
+    settings = read_json(settings_path, {})
+    compaction = settings.setdefault("compaction", {})
+    overrides = compaction.setdefault("modelOverrides", {})
+    model_key = PROVIDER + "/" + cfg["model"]
+    override = {**overrides.get(model_key, {}), "reserveTokens": cfg["max_output"],
+                "keepRecentTokens": min(4096, cfg["context"] // 4)}
+    if overrides.get(model_key) != override:
+        if settings_path.exists():
+            shutil.copy2(settings_path, settings_path.with_name(f"settings.json.bak-{time.time_ns()}"))
+        overrides[model_key] = override
+        write_json(settings_path, settings)
+
+
+def start_server(cfg):
+    # An existing Ollama instance may be handling other work.
+    if server_alive() and not service_loaded():
+        raise RuntimeError("Another Ollama instance is using port 11434. It will not be stopped or reconfigured.")
+    if server_alive():
+        return
+    configure(cfg)
+    if not service_loaded():
+        run(["launchctl", "bootstrap", DOMAIN, str(PLIST)])
+    run(["launchctl", "kickstart", f"{DOMAIN}/{LABEL}"])
+    for _ in range(60):
+        if server_alive():
+            return
+        time.sleep(0.5)
+    raise RuntimeError("Ollama did not start. Check ~/Library/Logs/ollama-local.log.")
+
+
+def apps():
+    result = run(["osascript", "-l", "JavaScript", "-e", APPS_JS], capture_output=True, text=True)
+    return json.loads(result.stdout)
+
+
+def candidates(cfg, running):
+    return [app for app in running if app["id"] in cfg["close_apps"]]
+
+
+def prepare(cfg):
+    start_server(cfg)
+    environment = {**os.environ, "OLLAMA_HOST": "127.0.0.1:11434", "OLLAMA_NO_CLOUD": "1"}
+    run(["ollama", "pull", cfg["source_model"]], env=environment)
+    body = f'FROM {cfg["source_model"]}\nPARAMETER num_ctx {cfg["context"]}\nPARAMETER num_predict {cfg["max_output"]}\n'
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".Modelfile") as file:
+        file.write(body)
+        file.flush()
+        run(["ollama", "create", cfg["model"], "-f", file.name], env=environment)
+    print("Devstral is ready. Downloading does not load the model weights into memory.")
+
+
+def enter(cfg, yes=False, keep_apps=False):
+    if STATE.exists():
+        raise RuntimeError("Local mode is already active or recovery is pending. Use status or off.")
+    start_server(cfg)
+    installed = {model["name"] for model in api("/api/tags").get("models", [])}
+    if cfg["model"] not in installed and cfg["model"] + ":latest" not in installed:
+        raise RuntimeError("The model is not ready. Run llm-mode prepare.")
+    selected = [] if keep_apps else candidates(cfg, apps())
+    if selected:
+        print("Request normal quit for: " + ", ".join(app["name"] for app in selected))
+        print("Check downloads, unsaved forms, and calls before continuing.")
+        if not yes:
+            if not sys.stdin.isatty() or input("Continue? [y/N] ").strip().lower() not in ("y", "yes"):
+                raise RuntimeError("Cancelled; no apps were closed.")
+    # Save first so an interrupted entry can be recovered.
+    state = {"phase": "entering", "apps": selected, "model": cfg["model"], "entered_at": time.time()}
+    write_json(STATE, state)
+    if selected:
+        ids = [app["id"] for app in selected]
+        run(["osascript", "-l", "JavaScript", "-e", QUIT_JS, json.dumps(ids)])
+        remaining = ids
+        for _ in range(40):
+            running = {app["id"] for app in apps()}
+            remaining = [app_id for app_id in ids if app_id in running]
+            if not remaining:
+                break
+            time.sleep(0.5)
+        if remaining:
+            raise RuntimeError("Some apps are waiting for quit confirmation. Resolve this on the Mac or run llm-mode off; nothing will be forced.")
+    write_json(STATE, {**state, "phase": "active"})
+    print(f'Local mode is active: {cfg["context"]} tokens, one request at a time.')
+    print("Run llm-mode code in the repository. To release the model and reopen apps: llm-mode off.")
+
+
+def leave():
+    state = read_json(STATE, {"apps": []})
+    if service_loaded():
+        # Stop only the service owned by this command.
+        run(["launchctl", "bootout", f"{DOMAIN}/{LABEL}"])
+        for _ in range(40):
+            if not server_alive():
+                break
+            time.sleep(0.25)
+        else:
+            raise RuntimeError("Ollama is still shutting down; run off again before reopening apps.")
+    running = {app["id"] for app in apps()} if state["apps"] else set()
+    pending = []
+    for app in state["apps"]:
+        if app["id"] in running:
+            continue
+        try:
+            run(["open", "-g", "-b", app["id"]])
+            print(f'Reopened: {app["name"]}')
+        except subprocess.CalledProcessError:
+            pending.append(app)
+    if pending:
+        write_json(STATE, {**state, "apps": pending})
+        raise RuntimeError("Some apps could not be reopened; run off again to retry only those apps.")
+    STATE.unlink(missing_ok=True)
+    print("Local mode is off. Development processes were left running.")
+
+
+def status(cfg):
+    state = read_json(STATE, {})
+    print("Mode: " + ("active/recoverable" if state else "off"))
+    print(f'Model: {cfg["model"]}; context: {cfg["context"]}; max output: {cfg["max_output"]}')
+    if server_alive():
+        print(json.dumps(api("/api/ps"), indent=2))
+    else:
+        print("Ollama is stopped.")
+    selected = candidates(cfg, apps())
+    print("Open apps on the quit list: " + (", ".join(app["name"] for app in selected) or "none"))
+    run(["sysctl", "vm.swapusage"])
+
+
+def code_command(cfg, extra, wait_claude=False):
+    command = ["pi", "--no-extensions", "--no-mcp", "--no-skills", "--no-prompt-templates", "--offline",
+               "--tools", "read,bash,edit,write", "--provider", PROVIDER, "--model", cfg["model"]]
+    scope = PROVIDER + "/*"
+    if wait_claude:
+        package = HOME / ".pi/agent/npm/node_modules/pi-claude-bridge"
+        manifest = read_json(package / "package.json", {})
+        extensions = manifest.get("pi", {}).get("extensions", [])
+        fallback = Path(__file__).resolve().parent.parent / "pi/extensions/usage-fallback.ts"
+        if not extensions or not fallback.is_file():
+            raise RuntimeError("Returning to Claude requires pi-claude-bridge and the usage-fallback extension.")
+        for relative in extensions:
+            entry = (package / relative).resolve()
+            if not entry.is_relative_to(package.resolve()) or not entry.exists():
+                raise RuntimeError("Invalid entry point in the pi-claude-bridge package.")
+            command += ["-e", str(entry)]
+        command += ["-e", str(fallback), "--wait-claude", "--usage-fallback", PROVIDER + "/" + cfg["model"]]
+        scope += ",claude-bridge/*,anthropic/*"
+    return [*command, "--models", scope, *extra]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("configure", "prepare", "status", "on", "off", "code"), nargs="?", default="status")
+    parser.add_argument("--yes", action="store_true", help="Confirm quitting the listed apps.")
+    parser.add_argument("--keep-apps", action="store_true", help="Enter without closing apps.")
+    parser.add_argument("--wait-claude", action="store_true", help="In code, allow automatic return to Claude after quota reset.")
+    args, extra = parser.parse_known_args()
+    if args.wait_claude and args.command != "code":
+        parser.error("--wait-claude is only supported with code")
+    if extra and args.command != "code":
+        parser.error("extra arguments are only supported with code")
+    if sys.platform != "darwin":
+        parser.error("Run this on the MacBook, directly or over SSH.")
+    cfg = config()
+    command = None
+    if args.command == "code":
+        if extra[:1] == ["--"]:
+            extra = extra[1:]
+        command = code_command(cfg, extra, args.wait_claude)
+    if args.command == "status":
+        status(cfg)
+        return 0
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if args.command == "configure":
+        # Updating the profile does not affect downloads or app state.
+        with (STATE_DIR / "configure.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            configure(cfg)
+        return 0
+    with (STATE_DIR / "lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("Another llm-mode operation is in progress.")
+        if args.command == "prepare":
+            prepare(cfg)
+        elif args.command == "off":
+            leave()
+        elif args.command == "on" or not STATE.exists():
+            enter(cfg, args.yes, args.keep_apps)
+        elif args.command == "code":
+            if read_json(STATE, {}).get("phase") != "active":
+                raise RuntimeError("Entry is incomplete. Run llm-mode off before code.")
+            start_server(cfg)
+    if args.command == "code":
+        return subprocess.call(command)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (RuntimeError, subprocess.CalledProcessError, URLError, TimeoutError, OSError, ValueError) as error:
+        print(f"llm-mode: {error}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nInterrupted. Run llm-mode off to reopen any apps that were closed.", file=sys.stderr)
+        sys.exit(130)
