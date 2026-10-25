@@ -45,7 +45,7 @@ aim_server_healthy() {
 
 step "Preflight"
 case "$OS" in Darwin|Linux) ;; *) die "unsupported OS: $OS" ;; esac
-for bin in claude curl git python3 jq; do
+for bin in claude curl git python3 jq patch; do
   command -v "$bin" &>/dev/null || die "$bin not found on PATH"
 done
 mkdir -p "$HOME/.local/bin"
@@ -486,6 +486,7 @@ else
   ok "installed to ~/.pi/agent"
 fi
 PI="$(command -v pi || echo "$HOME/.local/bin/pi")"
+bash "$AI_DIR/pi/ensure-version.sh" "$PI"
 PI_DIR="$HOME/.pi/agent"
 mkdir -p "$PI_DIR/extensions"
 
@@ -506,34 +507,6 @@ link_pi lib
 for src in "$AI_DIR"/pi/extensions/*.ts; do
   link_pi "extensions/$(basename "$src")"
 done
-
-python3 - "$PI_DIR" "$AI_DIR/pi" <<'PY'
-import json, os, shutil, sys, time
-pi_dir, layer_dir = sys.argv[1:3]
-
-def merge(dst, src):
-    for key, value in src.items():
-        if isinstance(value, dict) and isinstance(dst.get(key), dict):
-            merge(dst[key], value)
-        else:
-            dst[key] = value
-    return dst
-
-for layer, target in (("settings.base.json", "settings.json"), ("claude-bridge.json", "claude-bridge.json"),
-                      ("auto-model.json", "auto-model.json")):
-    path = os.path.join(pi_dir, target)
-    current = json.load(open(path)) if os.path.exists(path) else {}
-    merged = merge(json.loads(json.dumps(current)), json.load(open(os.path.join(layer_dir, layer))))
-    if merged == current:
-        print(f"  · ~/.pi/agent/{target} already matches pi/{layer}")
-        continue
-    if os.path.exists(path):
-        shutil.copy2(path, f"{path}.bak-{int(time.time())}")
-    with open(path, "w") as f:
-        json.dump(merged, f, indent=2)
-        f.write("\n")
-    print(f"  \033[0;32m✓\033[0m merged pi/{layer} into ~/.pi/agent/{target} (backup kept)")
-PY
 
 # pi would also install a missing package on its first start; doing it here
 # keeps that start from waiting on npm or git. A git package is cloned to
@@ -568,6 +541,10 @@ jq -r '.packages[]? | if type == "object" then .source else . end | select(start
     warn "could not install $pkg — run: pi install $pkg"
   fi
 done
+
+# Activate the package filters only after the pinned compatibility build succeeds.
+python3 "$AI_DIR/pi/routing-compat/install.py" "$PI_DIR"
+python3 "$AI_DIR/pi/apply-settings.py" "$PI_DIR" "$AI_DIR/pi"
 
 if [ -f "$PI_DIR/extensions/rtk.ts" ]; then
   skip "rtk extension present"
