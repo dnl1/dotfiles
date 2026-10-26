@@ -187,7 +187,10 @@
  		const config = configs.get(state.sessionId) ?? DEFAULT_CONFIG;
  		const allowPrefix = fromUserPrompt && !state.initialPromptHandled;
  		// A new user task must never inherit an earlier task's dispatch permission.
-@@ -721,7 +737,7 @@
+@@ -676,0 +693,2 @@
++		// A new user task gets a fresh retry budget; cooldowns still apply.
++		if (fromUserPrompt) state.lastFailedRoute = undefined;
+@@ -721,7 +739,7 @@
  
  	// ─── Shared routing pipeline for execution and local previews ───
  	async function applyAutoRoute(
@@ -196,7 +199,7 @@
  		ctx: ExtensionContext,
  		state: SessionRuntimeState,
  		config: AutoModelConfig,
-@@ -1267,7 +1283,7 @@
+@@ -1267,7 +1285,7 @@
  	 * quota, budget, pin, or pool rules.
  	 */
  	function applyFallbackPlan(
@@ -205,7 +208,7 @@
  		ctx: ExtensionContext,
  		state: SessionRuntimeState,
  		config: AutoModelConfig,
-@@ -1712,7 +1728,7 @@
+@@ -1712,7 +1730,7 @@
  				return;
  			}
  			return {
@@ -214,7 +217,7 @@
  			};
  		} catch (error) {
  			notifySafe(ctx, `Pi Auto Model context failed: ${errorMessage(error)}`, "warning");
-@@ -1726,6 +1742,15 @@
+@@ -1726,6 +1744,15 @@
  			if (!contextIsCompatible(ctx)) {
  				return { cancel: true };
  			}
@@ -230,7 +233,7 @@
  			const state = stateForContext(store, ctx);
  			try {
  				const config = configs.get(state.sessionId) ?? DEFAULT_CONFIG;
-@@ -1784,6 +1809,7 @@
+@@ -1784,6 +1811,7 @@
  			clearAutoModelStatus(ctx);
  			await Promise.allSettled([metrics.flush(), quality.flush(), events.flush()]);
  			store.delete(ctx.sessionManager.getSessionId());
@@ -381,3 +384,68 @@
  }
  
  function sanitizeSurrogates(text: string): string {
+--- a/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
++++ b/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
+@@ -297,14 +297,10 @@
+ 	let trailingBoundary = payload.input.length;
+ 	while (trailingBoundary > leadingBoundary && isPromptEnvelopeItem(payload.input[trailingBoundary - 1])) {
+ 		trailingBoundary -= 1;
+-	}
+-
+-	for (let index = leadingBoundary; index < trailingBoundary; index++) {
+-		if (isPromptEnvelopeItem(payload.input[index])) {
+-			return undefined;
+-		}
+ 	}
+ 
++	// Envelope items between those boundaries are history, such as a system prompt update Pi recorded
++	// mid-session. The replay parity check compares them with the session like any other item.
+ 	try {
+ 		return {
+ 			...(typeof payload.instructions === "string" ? { instructions: payload.instructions } : {}),
+@@ -320,6 +316,26 @@
+ 	}
+ }
+ 
++// A system prompt update that is the last history item sits where trailing prompt items go. Move it back to
++// the history when it is the next item Pi's own serialization expects there.
++function reclaimTrailingHistory(
++	preamble: FreshAuthoritativePreamble,
++	input: readonly unknown[],
++	expectedHistory: readonly ResponsesInputItem[],
++): FreshAuthoritativePreamble {
++	const trailingInput = [...preamble.trailingInput];
++	let historyLength = input.length - preamble.leadingInput.length - trailingInput.length;
++	while (
++		trailingInput.length > 0 &&
++		historyLength < expectedHistory.length &&
++		areEquivalentReplayItems([trailingInput[0]], [expectedHistory[historyLength]])
++	) {
++		trailingInput.shift();
++		historyLength += 1;
++	}
++	return { ...preamble, trailingInput };
++}
++
+ function collectReplayMessages(entries: readonly SessionEntry[]): AgentMessage[] {
+ 	const messages: AgentMessage[] = [];
+ 
+@@ -401,8 +417,8 @@
+ 		};
+ 	}
+ 
+-	const freshPreamble = extractFreshAuthoritativePreamble(args.payload);
+-	if (!freshPreamble) {
++	const extractedPreamble = extractFreshAuthoritativePreamble(args.payload);
++	if (!extractedPreamble) {
+ 		return {
+ 			ok: false,
+ 			reason: "unsupported-instructions",
+@@ -435,6 +451,7 @@
+ 		...preCompactionKeptMessages,
+ 		...postCompactionTailMessages,
+ 	]);
++	const freshPreamble = reclaimTrailingHistory(extractedPreamble, args.payload.input, serializedPiHistoryInput);
+ 	const freshPreambleCount = freshPreamble.leadingInput.length;
+ 	const trailingPreambleCount = freshPreamble.trailingInput.length;
+ 	const actualHistoryEnd = args.payload.input.length - trailingPreambleCount;

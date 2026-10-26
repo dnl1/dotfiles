@@ -282,6 +282,71 @@ describe("fail-closed validation", () => {
   });
 });
 
+// Pi records a system prompt update when, for example, the MCP server list changes mid-session.
+describe("system prompt update after the checkpoint", () => {
+  const midConvoModel = { ...model, compat: { supportsMidConvoSystemMessages: true } } as Model<Api>;
+  const update = { role: "system", content: "", sections: { mcp_servers: "<mcp_servers>\n- fixture-server\n</mcp_servers>" }, timestamp: 1 };
+  const updateText = 'Updated system prompt section "mcp_servers"';
+
+  function withUpdate(nextUser = true) {
+    const f = fixture();
+    const system = messageEntry("tail-system", f.branch.at(-1)!.id, update);
+    f.branch.push(system as unknown as SessionEntry);
+    if (nextUser) f.branch.push(messageEntry("next-user", system.id, makeUser("go on")) as unknown as SessionEntry);
+    return f;
+  }
+
+  test("keeps the update in its place in the replayed tail", () => {
+    const f = withUpdate();
+    const result = replay(f, payloadFor(f.branch, midConvoModel), midConvoModel);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.rewrittenPayload.input).toEqual([...f.compactedWindow, ...result.segments.postCompactionTail.input]);
+    const tail = result.segments.postCompactionTail.input as any[];
+    expect(tail.map((item) => item.type ?? item.role)).toEqual([
+      "user", "reasoning", "custom_tool_call", "custom_tool_call_output", "developer", "user",
+    ]);
+    expect(tail.at(-2).content).toContain(updateText);
+    expect(result.segments.trailingPreamble).toEqual([]);
+  });
+
+  test("passes the real extension hook", async () => {
+    const f = withUpdate();
+    const result = await requestHook()({ payload: payloadFor(f.branch, midConvoModel) }, hookContext(f.branch, midConvoModel));
+    expect(result.input.slice(0, f.compactedWindow.length)).toEqual(f.compactedWindow);
+    expect(result.input.some((item: any) => item.role === "developer" && String(item.content).includes(updateText))).toBe(true);
+  });
+
+  test("reclaims an update that is the last history item and keeps the trailing prompt", () => {
+    const f = withUpdate(false);
+    const payload = payloadFor(f.branch, midConvoModel);
+    const trailing = { role: "developer", content: "current trailing instructions" };
+    payload.input.push(trailing);
+    const result = replay(f, payload, midConvoModel);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.segments.trailingPreamble).toEqual([trailing]);
+    expect((result.segments.postCompactionTail.input.at(-1) as any).content).toContain(updateText);
+    expect(result.rewrittenPayload.input.at(-1)).toEqual(trailing);
+  });
+
+  test("still rejects a developer item the session does not have", async () => {
+    const f = withUpdate();
+    const payload = payloadFor(f.branch, midConvoModel);
+    payload.input.splice(payload.input.length - 1, 0, { role: "developer", content: "unrecorded instructions" });
+    expect(replay(f, payload, midConvoModel)).toMatchObject({ ok: false, reason: "expected-pi-replay-mismatch" });
+    await expect(requestHook()({ payload }, hookContext(f.branch, midConvoModel))).rejects.toThrow("expected-pi-replay-mismatch");
+  });
+
+  test("still rejects a changed update", () => {
+    const f = withUpdate();
+    const payload = payloadFor(f.branch, midConvoModel);
+    const item = payload.input.findLast((entry: any) => entry.role === "developer") as any;
+    item.content = item.content.replace("fixture-server", "other-server");
+    expect(replay(f, payload, midConvoModel)).toMatchObject({ ok: false, reason: "expected-pi-replay-mismatch" });
+  });
+});
+
 const entries = JSON.parse(JSON.stringify(syntheticBranch()));
 const fixtureBytes = JSON.stringify(entries);
 const byId = new Map(entries.map((entry: any) => [entry.id, entry]));

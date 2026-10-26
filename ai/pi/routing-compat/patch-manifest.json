@@ -13,7 +13,7 @@
   },
   "vendor/pi-auto-model/extensions/auto-model.ts": {
     "original_sha256": "31596e53670e8975121a8f8c893f5451689822ff140ff7405624fe0993f162d4",
-    "patched_sha256": "e98939710359d151ae0cba51e02114b0b6fc75d8204ea22d9e094049d6ac7eb8"
+    "patched_sha256": "f72e07e8cb832f5604185778bac02a415f7cb485b6bb6020cc18e02d2cf50545"
   },
   "vendor/pi-codex-native/src/compaction/extension.ts": {
     "original_sha256": "c605c414fea0d57da1c994d6c65ef70c9f8321c859a62fbfcf1109b918321b57",
@@ -26,5 +26,9 @@
   "vendor/pi-codex-native/src/responses/shared.ts": {
     "original_sha256": "c5d1a3d1c030feba1671c80ce8ccb260506f750ff18ba2f203caa4248dd540b8",
     "patched_sha256": "9f1b9ceaec1bc0d4e527a2366976db94af4fa4dbf91b05c69fb2da0c0ce6a8ef"
+  },
+  "vendor/pi-codex-native/src/compaction/payload-rewrite.ts": {
+    "original_sha256": "4fe386b5b5e5fc2f51dbbe4de0b6f54b7b70ddb105489541b6c4675ba1cc8875",
+    "patched_sha256": "7348c4fabe00ca117cc56363dce7a038fca1b1b6678aac554658684311b4a2bc"
   }
 }

@@ -4,11 +4,11 @@ The dotfiles bootstrap builds `~/.pi/agent/packages/pi-routing-compat` from the 
 
 ## Runtime
 
-Pi 1.4.0 or later is required. The bootstrap updates older Pi installs before preparing the package. It installs the pinned npm packages, verifies the seven upstream file hashes, applies `compat.patch`, verifies the patched hashes, then activates the settings layer. A failed build leaves the previous compatibility package in place. A changed build backs it up under `~/.pi/agent/backups/`.
+Pi 1.4.0 or later is required. The bootstrap updates older Pi installs before preparing the package. It installs the pinned npm packages, verifies the eight upstream file hashes, applies `compat.patch`, verifies the patched hashes, then activates the settings layer. A failed build leaves the previous compatibility package in place. A changed build backs it up under `~/.pi/agent/backups/`.
 
 Only the compatibility package registers Codex and automatic routing. The npm originals stay installed with `extensions: []`. Runtime dependencies and Pi peers use relative links created on each machine; no Mac paths are copied to WSL. The upstream licenses remain in the generated package.
 
-The patch preserves target-compatible reasoning and binds each routed request to its actual model and session. Codex owns native compaction and also produces a readable summary for switching providers. That summary requires an additional model request and consumes tokens. A failed summary cancels compaction instead of discarding context. An encrypted-only checkpoint blocks automatic provider switching until a successful `/compact` produces a readable summary.
+The patch preserves target-compatible reasoning and binds each routed request to its actual model and session. Codex owns native compaction and also produces a readable summary for switching providers. That summary requires an additional model request and consumes tokens. A failed summary cancels compaction instead of discarding context. An encrypted-only checkpoint blocks automatic provider switching until a successful `/compact` produces a readable summary. Pi records a system prompt update when, for example, the MCP server list changes mid-session; replay keeps these updates where they are in the history and checks them against the session like any other item.
 
 After applying changes, restart Pi. Existing session files are not rewritten or deleted. If a session still fails replay validation, preserve it and start a new session; never bypass the parity check.
 
