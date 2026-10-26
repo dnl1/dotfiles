@@ -29,6 +29,8 @@ STEPS=(
   system-packages
   eza
   gh-cli
+  tailscale
+  mosh
   oh-my-zsh
   powerlevel10k
   zsh-autosuggestions
@@ -38,6 +40,7 @@ STEPS=(
   bun
   go
   pnpm
+  pi
   opencode
   dotfiles
   default-shell
@@ -209,6 +212,33 @@ do_pnpm() {
   curl -fsSL https://get.pnpm.io/install.sh | sh -
 }
 
+do_tailscale() {
+  if command -v tailscale &>/dev/null; then return 0; fi
+  # Adds Tailscale's apt repository. tailscaled needs systemd, which WSL only has
+  # once repair-wsl-network.sh (or /etc/wsl.conf) enables it.
+  curl -fsSL https://tailscale.com/install.sh | sh
+}
+
+# mosh-server lets a phone client (Moshi) keep a session across network changes.
+do_mosh() {
+  if command -v mosh-server &>/dev/null; then return 0; fi
+  DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq mosh
+}
+
+do_pi() {
+  # A resumed run skips node-lts, which is the step that loads nvm.
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck source=/dev/null
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  # The installer links pi into a bin directory already on PATH; .zshrc adds this one.
+  mkdir -p "$HOME/.local/bin"
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v pi &>/dev/null; then return 0; fi
+  # It asks before installing (Enter accepts). Its output goes through sed so it
+  # does not offer to start pi before the setup finishes, as in ai/bootstrap.sh.
+  curl -fsSL https://pi.dev/install.sh | sh | sed 's/^/    /'
+}
+
 do_opencode() {
   if [ -x "$HOME/.opencode/bin/opencode" ]; then return 0; fi
   curl -fsSL https://opencode.ai/install | sh
@@ -262,6 +292,8 @@ for step in "${STEPS[@]}"; do
     system-packages)       run_step "$step" "System packages (apt)"         ;;
     eza)                   run_step "$step" "eza  (modern ls)"               ;;
     gh-cli)                run_step "$step" "GitHub CLI (gh)"                ;;
+    tailscale)             run_step "$step" "Tailscale"                      ;;
+    mosh)                  run_step "$step" "mosh"                           ;;
     oh-my-zsh)             run_step "$step" "Oh My Zsh"                      ;;
     powerlevel10k)         run_step "$step" "Powerlevel10k theme"            ;;
     zsh-autosuggestions)   run_step "$step" "zsh-autosuggestions plugin"     ;;
@@ -271,6 +303,7 @@ for step in "${STEPS[@]}"; do
     bun)                   run_step "$step" "bun"                            ;;
     go)                    run_step "$step" "Go toolchain"                   ;;
     pnpm)                  run_step "$step" "pnpm"                           ;;
+    pi)                    run_step "$step" "pi (coding agent)"              ;;
     opencode)              run_step "$step" "opencode"                       ;;
     dotfiles)              run_step "$step" "Dotfiles (symlink)"             ;;
     default-shell)         run_step "$step" "Set zsh as default shell"       ;;
@@ -283,7 +316,10 @@ echo
 echo -e "  ${DIM}Next steps:${RESET}"
 echo -e "    • Run ${BOLD}exec zsh${RESET} or open a new terminal"
 echo -e "    • Run ${BOLD}gh auth login${RESET} to authenticate with GitHub"
+echo -e "    • Run ${BOLD}sudo tailscale up${RESET} to join your tailnet (README, phone access)"
 echo -e "    • Run ${BOLD}p10k configure${RESET} to customize your prompt"
+echo -e "    • Run ${BOLD}~/.dotfiles/ai/bootstrap.sh${RESET} to set up herdr, MCPs and skills for pi"
+echo -e "      ${DIM}(needs Claude Code installed and logged in; see ai/README.md)${RESET}"
 echo
 
 # Warn if git identity is not configured (common on fresh machines)

@@ -6,10 +6,10 @@ rtk, codebase-memory-mcp, MCP tools and shared skills.
 
 ## Pi + herdr
 
-The shell installer below is for WSL/Ubuntu. The AI setup is a separate step
-that also supports macOS. It needs Claude Code (authenticated), Node/npm,
-Python 3, jq, curl and git; macOS also needs Homebrew. See
-[prerequisites and setup](ai/README.md) before running it.
+The shell installer below is for WSL/Ubuntu and installs pi with the rest of
+the tools. The AI setup is a separate step that also supports macOS. It needs
+Claude Code (authenticated), Node/npm, Python 3, jq, curl and git; macOS also
+needs Homebrew. See [prerequisites and setup](ai/README.md) before running it.
 
 ```bash
 # After cloning this repo (or using the shell installer below):
@@ -32,6 +32,9 @@ also enabled for new Pi sessions. Use `/auto-model off` and choose a concrete
 model if you want to keep it fixed. State, OAuth tokens and sessions stay local.
 Employer-specific settings are excluded from the public repo, and public
 clones do not enable unattended auto-sync unless you opt in.
+
+To drive pi from your phone away from home, see
+[Phone access](#phone-access-tailscale--moshi).
 
 [Daily usage](ai/USAGE.md) · [Configuration and updates](ai/README.md)
 
@@ -105,6 +108,7 @@ To start over from scratch:
 | Tool | Purpose |
 |------|---------|
 | zsh + oh-my-zsh | Shell and plugin framework |
+| tmux | Terminal multiplexer (`.tmux.conf`) |
 | powerlevel10k | Fast, informative prompt theme |
 | zsh-autosuggestions | Fish-like command suggestions as you type |
 | zsh-syntax-highlighting | Colors commands green/red before you run them |
@@ -113,12 +117,16 @@ To start over from scratch:
 | zoxide | Smarter `cd` — jump to frecent directories with `z` |
 | fzf | Fuzzy finder for history, files, and more |
 | ripgrep | Faster `grep` alternative |
+| jq | JSON processor, used by the AI setup and status lines |
 | nvm + Node LTS | Node.js version manager |
 | bun | Fast JS runtime and package manager |
 | Go | Go toolchain |
 | pnpm | Efficient Node package manager |
+| pi | Coding agent ([pi.dev](https://pi.dev)); `ai/bootstrap.sh` adds herdr, MCPs and skills |
 | opencode | AI coding agent (terminal-based) |
 | gh | GitHub CLI — PRs, issues, repos from the terminal |
+| Tailscale | Private network to reach this machine from the phone (see [Phone access](#phone-access-tailscale--moshi)) |
+| mosh | Keeps a remote terminal alive across network changes and sleep |
 
 ### Manual install (dotfiles only)
 
@@ -201,7 +209,7 @@ gp --force-with-lease     # push rebased branch (safer than --force)
 | Command | Description |
 |---------|-------------|
 | `herdr` / `pi` | Terminal workspace and coding agent (see Pi + herdr above) |
-| `ai-team` | Older OpenCode/tmux workflow (see below) |
+| `ai-team` | Deprecated OpenCode/tmux workflow; use pi inside herdr (see below) |
 | `opencode` | Open the AI coding agent in the current directory |
 
 ### Misc (oh-my-zsh plugins)
@@ -215,7 +223,9 @@ gp --force-with-lease     # push rebased branch (safer than --force)
 
 ---
 
-## ai-team
+## ai-team (deprecated)
+
+> `ai-team` is no longer maintained. Use pi inside herdr instead ([Pi + herdr](#pi--herdr)).
 
 Launches a tmux session with N `opencode` AI agents and a monitor pane where you can run shell commands freely.
 
@@ -237,6 +247,65 @@ ai-team reset 2      # kill session and recreate with 2 agents
 | `wildcard` | Problem solver — fixes tests, optimizes, debugs |
 
 The session recreates automatically if the agent count changes or the layout version is bumped.
+
+---
+
+## Phone access (Tailscale + Moshi)
+
+Run pi and herdr on your machine and use them from the phone anywhere, with no
+public IP or port forwarding. Tailscale puts the phone and the machine on the
+same private network, and [Moshi](https://getmoshi.app) (iOS and Android) is
+the terminal: it attaches to herdr sessions, keeps them alive over mosh, and
+shows pi's turns, approvals and notifications through its `moshi-hook`.
+
+1. **Tailscale on both ends.** Install the Tailscale app on the phone and sign
+   in. On the machine, sign in to the same account:
+   - WSL/Ubuntu: `setup.sh` installs Tailscale and mosh. `tailscaled` needs
+     systemd, which `repair-wsl-network.sh` enables. Then run
+     `sudo tailscale up`.
+   - macOS: `brew install --cask tailscale-app` (open the app and sign in) and
+     `brew install mosh`.
+
+   `tailscale status` shows the machine's MagicDNS name and
+   `tailscale ip -4` its `100.x.y.z` address.
+2. **SSH on the machine.** Moshi connects through the machine's own SSH
+   server, carried by the Tailscale tunnel.
+   - WSL/Ubuntu: `sudo apt install openssh-server`, then
+     `sudo systemctl enable --now ssh`.
+   - macOS: System Settings → General → Sharing → Remote Login.
+
+   Leave *Tailscale SSH* (`tailscale up --ssh`) off. It takes over port 22,
+   so Moshi's key login hangs for a minute and then fails with an auth error,
+   and mosh cannot start through it. `sudo tailscale set --ssh=false` turns
+   it off.
+3. **Pair the phone.** Install `moshi-hook` on the machine and keep it
+   running:
+   - WSL/Ubuntu: `curl -fsSL https://getmoshi.app/install.sh | sh`, then
+     `moshi-hook service install`.
+   - macOS: `brew tap rjyo/moshi && brew trust rjyo/moshi &&
+     brew install moshi-hook`, then `brew services start moshi-hook`.
+
+   Run `moshi-hook host setup` and scan the QR code with Moshi's *Easy
+   Pair*. It saves the connection and installs a key generated on the phone;
+   anyone who scans the QR before it expires gets SSH access, so do not share
+   it. Check that the saved host is the Tailscale name or `100.x` address,
+   not the LAN IP, or it will only work at home.
+4. **Agent notifications.** Copy the pairing token from Moshi's hook
+   settings and run `moshi-hook pair --token <token>` and
+   `moshi-hook install`. That adds hooks for pi
+   (`~/.pi/agent/extensions/moshi-hooks.ts`) and Claude Code.
+   `moshi-hook doctor` checks the daemon, pairing, hooks and herdr.
+
+Day to day, start `herdr` on the machine and run pi in a pane. In Moshi, open
+the connection and pick the herdr session; leave the connection type on
+*Auto* so it uses mosh and survives switching between Wi-Fi and mobile data.
+
+If Moshi does not list herdr sessions, herdr is probably missing from the
+PATH of non-interactive SSH commands. `ssh <host> 'command -v herdr'` should
+print its path; if it prints nothing, add
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshenv`. A Mac with the lid
+closed sleeps and drops mosh sessions; Moshi wakes it when reconnecting, and
+`caffeinate` (or Amphetamine) keeps it awake.
 
 ---
 
@@ -269,7 +338,7 @@ wsl --shutdown
 | `ai/` | Pi/herdr setup, shared skills, MCP configuration and bootstrap |
 | `.tmux.conf` | tmux plugins and worktree workflow |
 | `tests/` | Offline bootstrap, integration and sync checks |
-| `ai-team.sh` | Parametrized tmux AI session script |
+| `ai-team.sh` | Deprecated tmux AI session script (see *ai-team*) |
 | `fix-dns.sh` | WSL DNS auto-fix (runs on shell start) |
 | `repair-wsl-network.sh` | Full WSL network repair |
 | `install.sh` | curl one-liner — clones repo and runs setup |
