@@ -386,27 +386,28 @@
  function sanitizeSurrogates(text: string): string {
 --- a/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
 +++ b/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
-@@ -297,14 +297,10 @@
- 	let trailingBoundary = payload.input.length;
- 	while (trailingBoundary > leadingBoundary && isPromptEnvelopeItem(payload.input[trailingBoundary - 1])) {
+@@ -299,12 +299,8 @@
  		trailingBoundary -= 1;
--	}
--
+ 	}
+ 
 -	for (let index = leadingBoundary; index < trailingBoundary; index++) {
 -		if (isPromptEnvelopeItem(payload.input[index])) {
 -			return undefined;
 -		}
- 	}
- 
+-	}
+-
 +	// Envelope items between those boundaries are history, such as a system prompt update Pi recorded
 +	// mid-session. The replay parity check compares them with the session like any other item.
  	try {
  		return {
  			...(typeof payload.instructions === "string" ? { instructions: payload.instructions } : {}),
-@@ -320,6 +316,26 @@
- 	}
- }
- 
+@@ -317,7 +313,27 @@
+ 		};
+ 	} catch {
+ 		return undefined;
++	}
++}
++
 +// A system prompt update that is the last history item sits where trailing prompt items go. Move it back to
 +// the history when it is the next item Pi's own serialization expects there.
 +function reclaimTrailingHistory(
@@ -423,13 +424,11 @@
 +	) {
 +		trailingInput.shift();
 +		historyLength += 1;
-+	}
+ 	}
 +	return { ...preamble, trailingInput };
-+}
-+
- function collectReplayMessages(entries: readonly SessionEntry[]): AgentMessage[] {
- 	const messages: AgentMessage[] = [];
+ }
  
+ function collectReplayMessages(entries: readonly SessionEntry[]): AgentMessage[] {
 @@ -401,8 +417,8 @@
  		};
  	}
@@ -441,7 +440,19 @@
  		return {
  			ok: false,
  			reason: "unsupported-instructions",
-@@ -435,6 +451,7 @@
+@@ -425,7 +441,10 @@
+ 		};
+ 	}
+ 
+-	const preCompactionEntries = args.branchEntries.slice(firstKeptEntryIndex, boundaryIndex);
++	// Pi 1.4 replaces retained system deltas with the compaction's systemMessage snapshot.
++	const preCompactionEntries = args.branchEntries
++		.slice(firstKeptEntryIndex, boundaryIndex)
++		.filter((entry) => entry.type !== "message" || entry.message.role !== "system");
+ 	const postCompactionEntries = args.branchEntries.slice(boundaryIndex + 1);
+ 	const preCompactionKeptMessages = collectReplayMessages(preCompactionEntries);
+ 	const postCompactionTailMessages = collectReplayMessages(postCompactionEntries);
+@@ -435,6 +454,7 @@
  		...preCompactionKeptMessages,
  		...postCompactionTailMessages,
  	]);
@@ -449,11 +460,3 @@
  	const freshPreambleCount = freshPreamble.leadingInput.length;
  	const trailingPreambleCount = freshPreamble.trailingInput.length;
  	const actualHistoryEnd = args.payload.input.length - trailingPreambleCount;
---- a/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
-+++ b/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
-@@ -444 +444,4 @@
--	const preCompactionEntries = args.branchEntries.slice(firstKeptEntryIndex, boundaryIndex);
-+	// Pi 1.4 replaces retained system deltas with the compaction's systemMessage snapshot.
-+	const preCompactionEntries = args.branchEntries
-+		.slice(firstKeptEntryIndex, boundaryIndex)
-+		.filter((entry) => entry.type !== "message" || entry.message.role !== "system");
