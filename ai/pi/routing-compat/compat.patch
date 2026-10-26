@@ -449,3 +449,11 @@
  	const freshPreambleCount = freshPreamble.leadingInput.length;
  	const trailingPreambleCount = freshPreamble.trailingInput.length;
  	const actualHistoryEnd = args.payload.input.length - trailingPreambleCount;
+--- a/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
++++ b/vendor/pi-codex-native/src/compaction/payload-rewrite.ts
+@@ -444 +444,4 @@
+-	const preCompactionEntries = args.branchEntries.slice(firstKeptEntryIndex, boundaryIndex);
++	// Pi 1.4 replaces retained system deltas with the compaction's systemMessage snapshot.
++	const preCompactionEntries = args.branchEntries
++		.slice(firstKeptEntryIndex, boundaryIndex)
++		.filter((entry) => entry.type !== "message" || entry.message.role !== "system");

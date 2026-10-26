@@ -29,6 +29,6 @@
   },
   "vendor/pi-codex-native/src/compaction/payload-rewrite.ts": {
     "original_sha256": "4fe386b5b5e5fc2f51dbbe4de0b6f54b7b70ddb105489541b6c4675ba1cc8875",
-    "patched_sha256": "7348c4fabe00ca117cc56363dce7a038fca1b1b6678aac554658684311b4a2bc"
+    "patched_sha256": "f14641d4ba19431a7aac07aa6502e1fcfea2712624ed1f41c87fca9dd39baf79"
   }
 }

@@ -105,6 +105,32 @@ describe("replay without pi-auto-model", () => {
     expect(JSON.stringify(result.rewrittenPayload.input)).not.toContain("rs_kept");
   });
 
+  test("matches Pi 1.4 retained system-message projection", () => {
+    const f = fixture();
+    const update = messageEntry("kept-system", f.branch[1].id, {
+      role: "system", content: "superseded prompt delta", timestamp: 1,
+    });
+    f.compaction.parentId = update.id;
+    Object.assign(f.compaction, {
+      systemMessage: { role: "system", content: "current prompt snapshot", timestamp: 1 },
+    });
+    f.branch.splice(2, 0, update as unknown as SessionEntry);
+    const currentModel = { ...model, compat: { supportsMidConvoSystemMessages: true } } as Model<Api>;
+    const payload = payloadFor(f.branch, currentModel);
+    const before = JSON.stringify({ branch: f.branch, payload });
+    const result = replay(f, payload, currentModel);
+    if (!result.ok) throw new Error(`${result.reason}: ${result.parity?.mismatches.slice(0, 3).join("; ")}`);
+    expect(result.rewrittenPayload.instructions).toBe("current prompt snapshot");
+    expect(result.rewrittenPayload.input).toEqual([
+      ...f.compactedWindow, ...result.segments.postCompactionTail.input,
+    ]);
+    expect(result.segments.postCompactionTail.input.map((item: any) => item.type ?? item.role)).toEqual([
+      "user", "reasoning", "custom_tool_call", "custom_tool_call_output",
+    ]);
+    expect(JSON.stringify(result.rewrittenPayload.input)).not.toContain("superseded prompt delta");
+    expect(JSON.stringify({ branch: f.branch, payload })).toBe(before);
+  });
+
   test("preserves current instructions, leading context and trailing developer prompt", () => {
     const f = fixture();
     const payload = payloadFor(f.branch);
