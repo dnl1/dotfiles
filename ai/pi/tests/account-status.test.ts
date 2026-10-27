@@ -93,6 +93,29 @@ test("OpenAI is not labelled as a Claude subscription", async (t) => {
 	assert.equal(h.executions.length, 0);
 });
 
+test("auto identifies the Claude account from the physical response", async (t) => {
+	const h = harness(t);
+	h.ctx.model = { provider: "pi-auto-model", id: "auto" };
+	h.ctx.sessionManager.getBranch = () => [{ type: "message", message: { role: "assistant", provider: "claude-bridge", model: "claude-opus-5-5" } }];
+	await h.start();
+	assert.match(h.statuses.at(-1)!, /trabalho.*work@example.test.*Team/);
+});
+
+test("auto refreshes the account when a provider stream fails over", async (t) => {
+	const h = harness(t);
+	h.ctx.model = { provider: "pi-auto-model", id: "auto" };
+	await h.start();
+	assert.match(h.statuses.at(-1)!, /aguardando rota/);
+	await h.handlers.get("provider_stream_event")({ provider: "claude-bridge" }, h.ctx);
+	assert.match(h.statuses.at(-1)!, /trabalho/);
+	process.env.CLAUDE_CONFIG_DIR = h.personal;
+	await h.handlers.get("model_select")({}, h.ctx);
+	await h.handlers.get("message_start")({ message: { role: "assistant", provider: "claude-bridge" } }, h.ctx);
+	assert.match(h.statuses.at(-1)!, /pessoal.*personal@example.test/);
+	await h.handlers.get("provider_stream_event")({ provider: "openai-codex" }, h.ctx);
+	assert.match(h.statuses.at(-1)!, /OpenAI\/Codex/);
+});
+
 test("the bridge footer identifies the work account", async (t) => {
 	const h = harness(t);
 	h.ctx.model = { provider: "claude-bridge", id: "claude-opus-5-5" };

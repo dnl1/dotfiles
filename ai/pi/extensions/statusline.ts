@@ -10,6 +10,7 @@
 import { basename, dirname, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
+import { AUTO_PROVIDER, AUTO_STATUS, compactAutoStatus, selectedRoute } from "../lib/model-status.ts";
 
 const RATE_LIMIT_PREFIX = "anthropic-ratelimit-unified-";
 const REFRESH_MS = 30_000;
@@ -86,13 +87,14 @@ export default function (pi: ExtensionAPI) {
 				},
 				invalidate() {},
 				render(width: number): string[] {
+					const extensionStatuses = footerData.getExtensionStatuses();
 					const lines = [
-						renderTop(ctx, theme, pi.getThinkingLevel(), rateLimits),
+						renderTop(ctx, theme, pi.getThinkingLevel(), rateLimits, extensionStatuses.get(AUTO_STATUS)),
 						renderBottom(theme, git, footerData.getGitBranch()),
 					];
-					const statuses = [...footerData.getExtensionStatuses().entries()]
+					const statuses = [...extensionStatuses.entries()]
 						.sort(([a], [b]) => a.localeCompare(b))
-						.map(([, text]) => text.replace(/\s+/g, " ").trim());
+						.map(([key, text]) => (key === AUTO_STATUS ? compactAutoStatus(text) : text).replace(/\s+/g, " ").trim());
 					if (statuses.length) lines.push(statuses.join(" "));
 					return lines.map((line) => truncateToWidth(line, width, theme.fg("dim", "...")));
 				},
@@ -137,8 +139,12 @@ function renderTop(
 	theme: Theme,
 	thinkingLevel: string,
 	rateLimits: { fiveHour?: Window; sevenDay?: Window },
+	autoStatus?: string,
 ): string {
-	const model = ctx.model?.name || ctx.model?.id || "Unknown Model";
+	const route = selectedRoute(ctx, autoStatus);
+	const model = ctx.model?.provider === AUTO_PROVIDER
+		? route ? `${route.id} (auto)` : "Auto: aguardando rota"
+		: ctx.model?.name || ctx.model?.id || "Unknown Model";
 	const percent = ctx.getContextUsage()?.percent;
 	const usage = percent == null ? "?" : `${Math.round(percent)}%`;
 	const cost = `$${sessionCost(ctx).toFixed(2)}`;
@@ -151,7 +157,7 @@ function renderTop(
 		.join(" | ");
 
 	const parts = [`🤖 ${model}`];
-	if (ctx.model?.reasoning) parts.push(`💪 ${thinkingLevel}`);
+	if (ctx.model?.reasoning || ctx.model?.provider === AUTO_PROVIDER) parts.push(`💪 ${thinkingLevel}`);
 	parts.push(`🧠 ${usage}`, `💰 ${cost}`, `⏱️ ${rl}`);
 	return parts.join(" | ");
 }

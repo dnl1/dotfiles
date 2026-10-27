@@ -7,30 +7,13 @@
       "source": "npm:pi-claude-bridge@0.9.3",
       "extensions": []
     },
-    {
-      "source": "npm:pi-codex-native@0.3.13",
-      "extensions": []
-    },
+    "npm:pi-codex-native@0.3.13",
     "git:github.com/stark-contrast/stark-ai-plugin@e93b5587e6085d2d07cf222713622068c7f5142a",
-    {
-      "source": "npm:pi-auto-model@0.9.1",
-      "extensions": []
-    },
-    "./packages/pi-routing-compat",
-    "npm:opencode-pi@1.5.0",
-    "npm:pi-ponytail@0.1.2",
-    {
-      "source": "npm:@rochecompaan/pi-context-paging@0.3.9",
-      "extensions": []
-    }
+    "npm:pi-auto-model@0.9.1",
+    "npm:billion-context@0.1.208"
   ],
   "skills": [
     "~/.claude/skills",
     "~/.claude/plugins/marketplaces/humanizer"
-  ],
-  "contextPaging": {
-    "enabled": false,
-    "tokenBudget": 128000,
-    "trimToTokens": 80000
-  }
+  ]
 }

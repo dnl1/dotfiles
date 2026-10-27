@@ -1,6 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { ACCOUNT_CHANGED, OVERRIDES, activeProfile, clean, identify as identifyAccount, profiles, restoreDirectory, type Profile, type Account } from "../lib/claude-accounts.ts";
 
+import { AUTO_PROVIDER, latestRoute } from "../lib/model-status.ts";
+
 const STATUS = "00-active-account";
 const REFRESH_MS = 60_000;
 function label(profile: Profile, account: Account): string {
@@ -20,6 +22,7 @@ export default function (pi: ExtensionAPI) {
 	let current: ExtensionContext | undefined;
 	let generation = 0;
 	let switching = false;
+	let routedProvider: string | undefined;
 
 	async function identify(profile: Profile, force = false): Promise<Account> {
 		const key = `${profile.directory}\n${profile.expectedEmail ?? ""}`;
@@ -33,9 +36,10 @@ export default function (pi: ExtensionAPI) {
 	async function refresh(ctx: ExtensionContext, force = false) {
 		if (!ctx.hasUI) return;
 		const epoch = generation;
-		const provider = ctx.model?.provider;
+		const provider = ctx.model?.provider === AUTO_PROVIDER
+			? routedProvider ?? latestRoute(ctx)?.provider : ctx.model?.provider;
 		if (provider !== "claude-bridge") {
-			const name = provider === "openai-codex" ? "OpenAI/Codex (sem Claude)" : provider === "anthropic" ? "Anthropic direto (fora do bridge)" : clean(provider) || "nenhum modelo";
+			const name = provider === "openai-codex" ? "OpenAI/Codex (sem Claude)" : provider === "anthropic" ? "Anthropic direto (fora do bridge)" : clean(provider) || (ctx.model?.provider === AUTO_PROVIDER ? "Auto: aguardando rota" : "nenhum modelo");
 			ctx.ui.setStatus(STATUS, `Conta: ${name}`);
 			return;
 		}
@@ -51,6 +55,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
+		routedProvider = undefined;
 		generation++;
 		current = ctx;
 		if (timer) clearInterval(timer);
@@ -60,9 +65,24 @@ export default function (pi: ExtensionAPI) {
 		await refresh(ctx);
 	});
 	pi.on("model_select", async (_event, ctx) => {
+		routedProvider = undefined;
 		generation++;
 		current = ctx;
 		await refresh(ctx, true);
+	});
+	pi.on("provider_stream_event", async (event, ctx) => {
+		if (ctx.model?.provider !== AUTO_PROVIDER || event.provider === AUTO_PROVIDER || routedProvider === event.provider) return;
+		routedProvider = event.provider;
+		generation++;
+		current = ctx;
+		await refresh(ctx);
+	});
+	pi.on("message_start", async (event, ctx) => {
+		if (ctx.model?.provider !== AUTO_PROVIDER || event.message.role !== "assistant" || event.message.provider === AUTO_PROVIDER || routedProvider === event.message.provider) return;
+		routedProvider = event.message.provider;
+		generation++;
+		current = ctx;
+		await refresh(ctx);
 	});
 	const unsubscribe = pi.events?.on(ACCOUNT_CHANGED, () => {
 		generation++;

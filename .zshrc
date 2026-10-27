@@ -149,7 +149,6 @@ alias dcd="docker compose down"
 # filesystem
 alias ..="cd .."
 alias ...="cd ../.."
-# Deprecated: use pi inside herdr.
 alias ai-team='zsh "$HOME/.dotfiles/ai-team.sh"'
 
 if command -v eza &>/dev/null; then

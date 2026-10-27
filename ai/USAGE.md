@@ -195,18 +195,24 @@ All three are linked into this repo. Commit and push edits to sync them to the
 other machine. A running herdr picks up binding changes after
 `herdr server reload-config`.
 
-### Copying to the Windows clipboard
+### Copying between machines
 
-When herdr on Windows is attached to the Mac, copies made on the Mac must
-reach Windows through OSC 52, which herdr forwards to the client:
+When herdr is attached to another machine, OSC 52 sends copied text to the
+viewing machine's clipboard. This works from a Mac viewing WSL and from
+Windows viewing a Mac.
 
-- Selecting with the mouse in pi copies to both the Mac and Windows
-  clipboards. `pi/extensions/herdr-clipboard.ts` enables this in herdr panes;
-  run `/reload` in sessions that were already open.
+- Copies made in pi also reach the viewing machine's clipboard.
+  `pi/extensions/herdr-clipboard.ts` enables OSC 52 in herdr panes;
+  run `/reload` in sessions that were already open when it was installed.
 - `wclip` copies a command's output or files: `git diff | wclip`,
   `wclip notes.txt`. An agent can run it too; it writes to the agent's pane.
 - `Ctrl+B`, then `[`: herdr's copy mode. `v` starts the selection, `y` copies.
-- Holding Shift while dragging uses Windows Terminal's own selection.
+- In Windows Terminal, holding Shift while dragging uses the terminal's own selection.
+
+`ai/bootstrap.sh` installs the extension and `wclip` on each machine. These
+files are linked to the dotfiles repository; no per-session setup is needed
+for new pi sessions. To test, run `printf 'Clipboard test' | wclip` in the
+remote pane and paste into an app on the viewing machine (Cmd+V on macOS).
 
 OSC 52 has no acknowledgement, so `wclip` only confirms that it sent the text.
 Payloads above about 75 KB are refused.
@@ -351,9 +357,8 @@ Calendar connectors belong to the claude.ai account, not these dotfiles.
 ## OpenCode
 
 ai-memory and codebase-memory-mcp are wired into OpenCode too. `ai-team`
-starts a tmux session of OpenCode agents (root README, *ai-team*); it is
-deprecated, so use pi inside herdr instead. Run `ai-memory doctor` in a repo
-to confirm its sessions are being captured.
+starts a tmux session of OpenCode agents (root README, *ai-team*). Run
+`ai-memory doctor` in a repo to confirm its sessions are being captured.
 
 ## Keeping both machines in step
 
