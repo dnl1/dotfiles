@@ -1,6 +1,6 @@
 ---
 name: writing-pull-requests
-description: Write, open or update a pull request or merge request, its title or description, following the repository template. Use for 'abre o PR', 'escreva a descrição da PR', 'atualize o resumo do merge request' and pull_request_template.md. Not for reviewing code in an existing PR without changing its description, or for commit messages alone. Use humanizer before publishing the prose.
+description: Write, open or update a pull request or merge request, its title or description, following the repository template. Use for 'open the PR', 'write the PR description', 'update the merge request summary' and pull_request_template.md. Not for reviewing code in an existing PR without changing its description, or for commit messages alone. Use humanizer before publishing the prose.
 ---
 
 # Writing Pull Requests

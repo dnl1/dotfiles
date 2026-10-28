@@ -8,12 +8,12 @@ import test from "node:test";
 const sourceDir = fileURLToPath(new URL("../ai/claude/skills/", import.meta.url));
 const piDir = fileURLToPath(new URL("../ai/pi/", import.meta.url));
 const names = ["codebase-design", "diagnosing-bugs", "grilling", "tdd", "writing-pull-requests"];
-const portugueseExamples = {
-  "codebase-design": "repense essa arquitetura",
-  "diagnosing-bugs": "investigue esse erro",
-  grilling: "questione minhas premissas",
-  tdd: "escreva o teste antes da correção",
-  "writing-pull-requests": "abre o PR",
+const englishExamples = {
+  "codebase-design": "rethink this architecture",
+  "diagnosing-bugs": "investigate this error",
+  grilling: "challenge my assumptions",
+  tdd: "write the test before the fix",
+  "writing-pull-requests": "open the PR",
 };
 let sdk;
 let sdkUnavailable;
@@ -36,7 +36,7 @@ for (const name of names) {
     assert.equal(skill.disableModelInvocation, false);
     assert(skill.description.length <= 1024);
     assert.match(skill.description, /Not for/);
-    assert(skill.description.includes(portugueseExamples[name]));
+    assert(skill.description.includes(englishExamples[name]));
   });
 }
 
@@ -50,7 +50,7 @@ test("skill prompt contains descriptions without injecting full workflows", { sk
   const { skills } = sdk.loadSkillsFromDir({ dir: sourceDir, source: "user" });
   const prompt = sdk.formatSkillsForPrompt(skills);
   for (const name of names) assert(prompt.includes(`<name>${name}</name>`));
-  assert(prompt.includes("investigue esse erro"));
+  assert(prompt.includes("investigate this error"));
   assert(!prompt.includes("## Phase 1"));
   assert(!prompt.includes("## Rules of the loop"));
 });

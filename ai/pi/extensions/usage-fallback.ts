@@ -111,7 +111,7 @@ export default function (pi: ExtensionAPI) {
   function nextRelease(): string {
     const times = Object.values(rotation?.blocked ?? {}).map((block) => block!.nextAt).filter((time) => time > Date.now());
     if (!times.length) return "";
-    return ` A primeira liberação prevista é às ${new Date(Math.min(...times)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
+    return ` The earliest expected reset is at ${new Date(Math.min(...times)).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`;
   }
 
   // Selects the profile's login and the model together; on failure the previous login stays active.
@@ -120,7 +120,7 @@ export default function (pi: ExtensionAPI) {
     try {
       restoreDirectory(profile.directory);
       if (await changeModel(ctx, model)) return true;
-    } catch { /* restaura abaixo */ }
+    } catch { /* Restore below. */ }
     restoreDirectory(previous);
     return false;
   }
@@ -150,7 +150,7 @@ export default function (pi: ExtensionAPI) {
       const account = await identify(pi, profile);
       if (ctx.signal?.aborted || epoch !== generation || key(ctx.model) !== key(target)) return false;
       if (!account.authenticated) {
-        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} fora da rotação: ${account.error ?? "sem login"}. Use /contas para conferir.`, "warning");
+        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} excluded from rotation: ${account.error ?? "not logged in"}. Use /contas to check.`, "warning");
         continue;
       }
       if (!(await select(ctx, profile, target))) continue;
@@ -162,7 +162,7 @@ export default function (pi: ExtensionAPI) {
       save();
       render(ctx);
       pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
-      if (ctx.hasUI) ctx.ui.notify(`Limite do Claude ${current.name} atingido. Continuando com a assinatura ${profile.name}, na mesma conversa.`, "warning");
+      if (ctx.hasUI) ctx.ui.notify(`Claude ${current.name} reached its limit. Continuing with subscription ${profile.name} in the same conversation.`, "warning");
       return true;
     }
     return false;
@@ -191,7 +191,7 @@ export default function (pi: ExtensionAPI) {
       const account = await identify(pi, profile);
       if (ctx.signal?.aborted || epoch !== generation || key(ctx.model) !== key(fallback)) return false;
       if (!account.authenticated) {
-        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} fora da rotação: ${account.error ?? "sem login"}. Use /contas para conferir.`, "warning");
+        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} excluded from rotation: ${account.error ?? "not logged in"}. Use /contas to check.`, "warning");
         continue;
       }
       if (!(await select(ctx, profile, target))) continue;
@@ -203,10 +203,10 @@ export default function (pi: ExtensionAPI) {
       save();
       render(ctx);
       pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
-      if (ctx.hasUI) ctx.ui.notify(`Limite de ${key(fallback)} atingido. Continuando com a assinatura Claude ${profile.name}, na mesma conversa.`, "warning");
+      if (ctx.hasUI) ctx.ui.notify(`${key(fallback)} reached its limit. Continuing with Claude subscription ${profile.name} in the same conversation.`, "warning");
       return true;
     }
-    if (ctx.hasUI) ctx.ui.notify(`Limite de ${key(fallback)} atingido e nenhuma assinatura Claude está disponível.${nextRelease()}`, "warning");
+    if (ctx.hasUI) ctx.ui.notify(`${key(fallback)} reached its limit and no Claude subscription is available.${nextRelease()}`, "warning");
     return false;
   }
 
@@ -238,7 +238,7 @@ export default function (pi: ExtensionAPI) {
         windows = {};
         saveRotation();
         pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
-        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} disponível de novo. A reserva ${reserveName} fica livre.`, "info");
+        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} is available again. Reserve ${reserveName} is now free.`, "info");
         return;
       }
       const fallback = fallbackModel();
@@ -252,9 +252,9 @@ export default function (pi: ExtensionAPI) {
         profile: account?.profile ?? candidates[0]?.name as ProfileName | undefined,
       };
       save();
-      if (ctx.hasUI) ctx.ui.notify(`${key(fallback)} disponível de novo. A reserva ${reserveName} fica livre.`, "info");
+      if (ctx.hasUI) ctx.ui.notify(`${key(fallback)} is available again. Reserve ${reserveName} is now free.`, "info");
     } catch {
-      /* Fica na reserva e tenta de novo no próximo ciclo. */
+      /* Stay on reserve and retry on the next cycle. */
     } finally {
       returning = false;
       if (!closed && epoch === generation) render(ctx);
@@ -267,7 +267,7 @@ export default function (pi: ExtensionAPI) {
     if (!watch && reserveActive(ctx)) {
       const above = [...rotationProfiles().map((profile) => profile.name as Link), FALLBACK_LINK];
       const wait = minutes(Math.min(...above.map((link) => rotation!.blocked[link]?.nextAt ?? 0)));
-      return ctx.ui.setStatus(ENTRY, `Claude ${rotation!.active} (reserva): sai ${wait ? `em ${wait} min` : "quando ocioso"}`);
+      return ctx.ui.setStatus(ENTRY, `Claude ${rotation!.active} (reserve): leave ${wait ? `in ${wait} min` : "when idle"}`);
     }
     const wait = watch ? minutes(watch.nextAt) : 0;
     ctx.ui.setStatus(ENTRY, !watch ? undefined : watch.phase === "trying"
@@ -327,7 +327,7 @@ export default function (pi: ExtensionAPI) {
     try {
       if (pending.profile) {
         const profile = rotationProfiles().find((candidate) => candidate.name === pending.profile);
-        if (!profile || !(await identify(pi, profile)).authenticated) throw new Error("Assinatura indisponível.");
+        if (!profile || !(await identify(pi, profile)).authenticated) throw new Error("Subscription unavailable.");
         if (closed || epoch !== generation || watch !== pending || !ctx.isIdle() || ctx.hasPendingMessages()) return;
         restoreDirectory(profile.directory);
         changedDirectory = true;
@@ -395,12 +395,12 @@ export default function (pi: ExtensionAPI) {
           rotation = structuredClone(saved.data);
           if (key(ctx.model) === key(rotation!.model)) {
             restoreDirectory(profile.directory);
-            if (!(await identify(pi, profile)).authenticated && ctx.hasUI) ctx.ui.notify(`A assinatura ${profile.name} desta sessão está sem login. Use /contas.`, "warning");
+            if (!(await identify(pi, profile)).authenticated && ctx.hasUI) ctx.ui.notify(`Subscription ${profile.name} for this session is not logged in. Use /contas.`, "warning");
             pi.events?.emit(ACCOUNT_CHANGED, { source: "restore" });
           }
         }
       } catch {
-        if (ctx.hasUI) ctx.ui.notify("Não foi possível restaurar a rotação. Confira claude-accounts.json.", "warning");
+        if (ctx.hasUI) ctx.ui.notify("Could not restore rotation. Check claude-accounts.json.", "warning");
       }
     }
     const entry = ctx.sessionManager.getBranch().findLast((item) => item.type === "custom" && item.customType === ENTRY);
@@ -494,7 +494,7 @@ export default function (pi: ExtensionAPI) {
       try {
         if (await useReserve(ctx, message.errorMessage ?? "")) return omitFailure();
       } catch {
-        if (ctx.hasUI) ctx.ui.notify("Rotação de assinaturas indisponível. Confira claude-accounts.json e /contas.", "warning");
+        if (ctx.hasUI) ctx.ui.notify("Subscription rotation is unavailable. Check claude-accounts.json and /contas.", "warning");
       }
       return;
     }
@@ -508,15 +508,15 @@ export default function (pi: ExtensionAPI) {
     try {
       if (await rotate(ctx, target, thinking, message.errorMessage ?? "", prior?.attempts ?? 0)) return omitFailure();
     } catch {
-      if (ctx.hasUI) ctx.ui.notify("Rotação de assinaturas indisponível. Confira claude-accounts.json e /contas.", "warning");
+      if (ctx.hasUI) ctx.ui.notify("Subscription rotation is unavailable. Check claude-accounts.json and /contas.", "warning");
     }
     if (ctx.signal?.aborted || epoch !== generation || key(ctx.model) !== key(target)) return;
     if (blocked(FALLBACK_LINK) && hasReserve()) {
-      if (ctx.hasUI) ctx.ui.notify(`Claude e ${key(fallback)} estão no limite, e nenhuma assinatura da rotação está disponível.${nextRelease()}`, "warning");
+      if (ctx.hasUI) ctx.ui.notify(`Claude and ${key(fallback)} are at their limits, and no subscription in the rotation is available.${nextRelease()}`, "warning");
       return;
     }
     let account: ReturnType<typeof returnAccount> | undefined;
-    try { account = rotation && returnAccount(); } catch { /* O fallback continua disponível com configuração inválida. */ }
+    try { account = rotation && returnAccount(); } catch { /* Fallback remains available with invalid configuration. */ }
     let changed = false;
     try { changed = key(fallback) !== key(target) && await changeModel(ctx, fallback); } catch {}
     if (!changed) {

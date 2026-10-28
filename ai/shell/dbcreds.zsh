@@ -38,7 +38,7 @@ dbcreds-setup() {
 
 _dbcreds_notify() {
   [[ ${HERDR_ENV:-} == 1 ]] && command -v herdr >/dev/null 2>&1 || return 0
-  herdr notification show 'Desbloquear cofre GPG' --body 'Desbloqueie na janela nativa ou rode dbcreds-unlock --terminal em outro painel do Herdr. Nunca envie a senha ao agente.' --sound request >/dev/null 2>&1 || true
+  herdr notification show 'Unlock GPG store' --body 'Unlock it in the native window or run dbcreds-unlock --terminal in another Herdr pane. Never send the password to the agent.' --sound request >/dev/null 2>&1 || true
 }
 
 # Try the cache without prompting first, so a cached key does not send spurious requests.
@@ -143,7 +143,7 @@ dbcreds-unlock() {
     json=$(_dbcreds_gpg --decrypt "$store") || return
   fi
   unset json
-  print 'Cofre GPG desbloqueado.'
+  print 'GPG store unlocked.'
 }
 
 # Forgets the cached passphrase now instead of when the 24 h are up.

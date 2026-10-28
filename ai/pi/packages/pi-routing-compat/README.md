@@ -1,36 +1,36 @@
-# Compatibilidade entre roteamento automático e Codex
+# Automatic routing and Codex compatibility
 
-Este pacote local mantém o roteador do `pi-auto-model@0.9.1` e o provedor do `pi-codex-native@0.3.13`. As cópias ficam em `vendor/`; os pacotes npm originais continuam instalados, com suas extensões desativadas para evitar registros duplicados.
+This local package contains the `pi-auto-model@0.9.1` router and the `pi-codex-native@0.3.13` provider. The copies live in `vendor/`; the original npm packages remain installed with their extensions disabled to avoid duplicate registrations.
 
-## Correções
+## Fixes
 
-- Preserva o raciocínio do modelo de destino. O serializador do Codex continua responsável pela conversão do histórico Responses.
-- Identifica o modelo real de cada tentativa do proxy com `AsyncLocalStorage`, separado por sessão, para validar e restaurar o checkpoint correto.
-- Deixa a compactação nativa com o Codex e salva também um resumo legível para outros provedores. O resumo recebe o checkpoint anterior em uma requisição SSE isolada.
-- Impede uma troca automática para outro provedor quando o checkpoint antigo só tem o marcador `[OpenAI native compaction checkpoint]`. Execute `/compact` para criar o resumo legível antes da troca.
-- Usa os contratos de contexto e ferramentas adicionais do Pi 1.4, incluindo mensagens de extensão sem `prompt`.
-- Mantém a regra de fallback: depois de emitir texto ou chamada de ferramenta, a tentativa não pode ser repetida em outro modelo.
+- Preserves the target model's reasoning settings. The Codex serializer still handles Responses history conversion.
+- Identifies the actual model for each proxy attempt with session-scoped `AsyncLocalStorage` to validate and restore the correct checkpoint.
+- Keeps native compaction with Codex and saves a readable summary for other providers. The summary receives the previous checkpoint in an isolated SSE request.
+- Blocks automatic provider switching when an old checkpoint contains only the `[OpenAI native compaction checkpoint]` marker. Run `/compact` to create a readable summary before switching.
+- Uses Pi 1.4's context and additional-tool contracts, including extension messages without `prompt`.
+- Preserves the fallback rule: after an attempt emits text or a tool call, it cannot be retried on another model.
 
-Cada compactação nativa passa a incluir uma requisição adicional para o resumo legível. Ela consome tokens. Se o resumo falhar, a compactação é cancelada, preservando o histórico anterior.
+Each native compaction adds a request for the readable summary, which consumes tokens. If the summary fails, compaction is cancelled and the previous history stays intact.
 
-## Uso
+## Usage
 
-Execute `/reload` e `/auto-model on`, ou selecione `pi-auto-model/auto` em `/model`. Pools, pesos e regras continuam em `~/.pi/agent/auto-model.json`.
+Run `/reload` and `/auto-model on`, or select `pi-auto-model/auto` in `/model`. Pools, weights and rules remain in `~/.pi/agent/auto-model.json`.
 
-Para esta sessão antiga, execute `/compact` com Codex selecionado antes de ativar o modo automático. Novas compactações já incluem os dois formatos.
+For an older session, run `/compact` with Codex selected before enabling automatic mode. New compactions already include both formats.
 
-## Testes
+## Tests
 
 ```bash
-PI_SESSION_FILE=/caminho/da/sessao.jsonl bash test/run.sh
+PI_SESSION_FILE=/path/to/session.jsonl bash test/run.sh
 ```
 
-O conjunto verificado tem 183 testes e um smoke test do SDK, que carrega o pacote e despacha pelo roteador. Inclui o histórico local, compactação com resumo legível e transporte Codex com resposta SSE simulada. Não faz inferência paga nem escreve na sessão capturada.
+The verified suite has 183 tests and an SDK smoke test that loads the package and dispatches through the router. It covers local history, compaction with a readable summary, and Codex transport with a simulated SSE response. It makes no paid inference calls and does not write to the captured session.
 
-Quatro casos do pacote original ficam fora da execução: dois testes dependem de `pi-context-windows`, um de `pi-skills` e um exige compilar o binário Rust. O último é filtrado pelo nome; os três arquivos com imports ausentes são omitidos. Essas dependências também faltam antes deste patch.
+Four upstream cases are excluded: two tests depend on `pi-context-windows`, one on `pi-skills`, and one requires compiling the Rust binary. The last is filtered by name; the three files with missing imports are omitted. These dependencies were also missing before this patch.
 
-## Atualizações e reversão
+## Updates and rollback
 
-As cópias locais não são atualizadas pelo npm. Ao mudar a versão de qualquer pacote, reaplique e teste as alterações de `compat.patch`.
+npm does not update the local copies. When changing either package's version, reapply and test the changes in `compat.patch`.
 
-Para reverter, retire `./packages/pi-routing-compat` de `settings.json`, reative as extensões dos dois pacotes npm e execute `/reload`. Isso restaura também o conflito original. Há um backup `settings.json.bak-routing-*` anterior à ativação.
+To roll back, remove `./packages/pi-routing-compat` from `settings.json`, re-enable both npm packages' extensions, and run `/reload`. This also restores the original conflict. A `settings.json.bak-routing-*` backup predates activation.

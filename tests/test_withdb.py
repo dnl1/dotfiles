@@ -285,7 +285,7 @@ print('{"prod":"test-only-never-print-this-value"}')
         self.assertEqual(result.stdout, "prod\n")
         self.assertNotIn("never-print", result.stdout + result.stderr)
         notice = json.loads((self.home / "notification").read_text())
-        self.assertEqual(notice[:3], ["notification", "show", "Desbloquear cofre GPG"])
+        self.assertEqual(notice[:3], ["notification", "show", "Unlock GPG store"])
         self.assertEqual(notice[-2:], ["--sound", "request"])
         calls = [json.loads(line) for line in (self.home / "gpg-calls").read_text().splitlines()]
         self.assertEqual(len(calls), 2)
@@ -321,7 +321,7 @@ print('{"prod":"test-only-never-print-this-value"}')
         self.env["CACHE_HIT"] = "1"
         result = self.invoke("dbcreds-unlock")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "Cofre GPG desbloqueado.\n")
+        self.assertEqual(result.stdout, "GPG store unlocked.\n")
         self.assertNotIn("never-print", result.stdout + result.stderr)
 
 

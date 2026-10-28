@@ -6,9 +6,9 @@ import { AUTO_PROVIDER, latestRoute } from "../lib/model-status.ts";
 const STATUS = "00-active-account";
 const REFRESH_MS = 60_000;
 function label(profile: Profile, account: Account): string {
-	if (!account.authenticated) return `${profile.name}: ${account.error ?? "sem login"}`;
-	const plan = account.plan ? account.plan[0].toUpperCase() + account.plan.slice(1) : "plano não informado";
-	return `${profile.name}: ${account.email || "e-mail não informado"} (${plan})`;
+	if (!account.authenticated) return `${profile.name}: ${account.error ?? "not logged in"}`;
+	const plan = account.plan ? account.plan[0].toUpperCase() + account.plan.slice(1) : "plan not reported";
+	return `${profile.name}: ${account.email || "email not reported"} (${plan})`;
 }
 
 function loginCommand(profile: Profile): string {
@@ -39,18 +39,18 @@ export default function (pi: ExtensionAPI) {
 		const provider = ctx.model?.provider === AUTO_PROVIDER
 			? routedProvider ?? latestRoute(ctx)?.provider : ctx.model?.provider;
 		if (provider !== "claude-bridge") {
-			const name = provider === "openai-codex" ? "OpenAI/Codex (sem Claude)" : provider === "anthropic" ? "Anthropic direto (fora do bridge)" : clean(provider) || (ctx.model?.provider === AUTO_PROVIDER ? "Auto: aguardando rota" : "nenhum modelo");
-			ctx.ui.setStatus(STATUS, `Conta: ${name}`);
+			const name = provider === "openai-codex" ? "OpenAI/Codex (no Claude)" : provider === "anthropic" ? "Direct Anthropic (outside the bridge)" : clean(provider) || (ctx.model?.provider === AUTO_PROVIDER ? "Auto: waiting for a route" : "no model");
+			ctx.ui.setStatus(STATUS, `Account: ${name}`);
 			return;
 		}
 		try {
 			const override = OVERRIDES.filter((name) => process.env[name]);
-			if (override.length) return ctx.ui.setStatus(STATUS, `Conta: assinatura não verificada (${override.join(", ")})`);
+			if (override.length) return ctx.ui.setStatus(STATUS, `Account: subscription not verified (${override.join(", ")})`);
 			const profile = activeProfile();
 			const account = await identify(profile, force);
-			if (generation === epoch && current === ctx) ctx.ui.setStatus(STATUS, `Conta: ${label(profile, account)} | claude-bridge`);
+			if (generation === epoch && current === ctx) ctx.ui.setStatus(STATUS, `Account: ${label(profile, account)} | claude-bridge`);
 		} catch {
-			ctx.ui.setStatus(STATUS, "Conta: configuração de perfis inválida");
+			ctx.ui.setStatus(STATUS, "Account: invalid profile configuration");
 		}
 	}
 
@@ -98,61 +98,61 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("contas", {
-		description: "Mostra os dois perfis do Claude Code e o provedor ativo, sem trocar o login.",
+		description: "Shows both Claude Code profiles and the active provider without changing the login.",
 		handler: async (_args, ctx) => {
 			if (!ctx.hasUI) return;
 			try {
 				const lines = await Promise.all(profiles().map(async (profile) => label(profile, await identify(profile, true))));
-				ctx.ui.notify([`Ativo: ${ctx.model?.provider ?? "nenhum"}/${ctx.model?.id ?? "nenhum"}`, ...lines].join("\n"), "info");
+				ctx.ui.notify([`Active: ${ctx.model?.provider ?? "none"}/${ctx.model?.id ?? "none"}`, ...lines].join("\n"), "info");
 			} catch {
-				ctx.ui.notify("Configuração inválida em claude-accounts.json.", "error");
+				ctx.ui.notify("Invalid configuration in claude-accounts.json.", "error");
 			}
 		},
 	});
 
 	pi.registerCommand("conta", {
-		description: "Troca o claude-bridge na mesma sessão: /conta trabalho ou /conta pessoal.",
+		description: "Switches claude-bridge in the same session: /conta trabalho or /conta pessoal.",
 		handler: async (args, ctx) => {
 			if (!ctx.hasUI || ctx.mode !== "tui") return;
 			const notify = (message: string) => { switching = false; ctx.ui.notify(message, "warning"); };
-			if (switching) return ctx.ui.notify("Uma troca de conta já está em andamento.", "warning");
-			if (!ctx.isIdle() || ctx.hasPendingMessages()) return notify("Espere o pedido atual terminar e esvazie a fila antes de trocar de conta.");
+			if (switching) return ctx.ui.notify("An account switch is already in progress.", "warning");
+			if (!ctx.isIdle() || ctx.hasPendingMessages()) return notify("Wait for the current request to finish and clear the queue before switching accounts.");
 			const override = OVERRIDES.filter((name) => process.env[name]);
-			if (override.length) return notify(`Estas variáveis podem substituir o login: ${override.join(", ")}. Remova-as antes de trocar de conta.`);
+			if (override.length) return notify(`These variables can override the login: ${override.join(", ")}. Remove them before switching accounts.`);
 			let profile: Profile | undefined;
 			try { profile = profiles().find((candidate) => candidate.name === args.trim()); }
-			catch { return notify("Configuração inválida em claude-accounts.json."); }
-			if (!profile) return notify("Use /conta trabalho ou /conta pessoal. /contas mostra os logins.");
+			catch { return notify("Invalid configuration in claude-accounts.json."); }
+			if (!profile) return notify("Use /conta trabalho or /conta pessoal. /contas shows the logins.");
 			switching = true;
 			const account = await identify(profile, true);
-			if (!account.authenticated) return notify(`${label(profile, account)}. Faça o login em outro terminal:\n${loginCommand(profile)}`);
+			if (!account.authenticated) return notify(`${label(profile, account)}. Log in from another terminal:\n${loginCommand(profile)}`);
 			const settings = pi.getSettings();
 			const modelId = ctx.model?.provider === "claude-bridge" ? ctx.model.id
 				: settings.defaultProvider === "claude-bridge" && settings.defaultModel ? settings.defaultModel : "claude-opus-5-5";
 			const model = ctx.modelRegistry.find("claude-bridge", modelId);
-			if (!model) return notify("Modelo do claude-bridge indisponível. Confira o pacote e use /reload.");
-			if (ctx.model?.provider === "claude-bridge" && activeProfile().directory === profile.directory) return notify(`${label(profile, account)} já está ativa.`);
-			const confirmed = await ctx.ui.confirm(`Trocar para ${profile.name}?`, `O histórico desta sessão será enviado a ${account.email} no próximo pedido. A troca é manual e não muda o login do outro perfil.`);
+			if (!model) return notify("The claude-bridge model is unavailable. Check the package and use /reload.");
+			if (ctx.model?.provider === "claude-bridge" && activeProfile().directory === profile.directory) return notify(`${label(profile, account)} is already active.`);
+			const confirmed = await ctx.ui.confirm(`Switch to ${profile.name}?`, `This session's history will be sent to ${account.email} on the next request. The switch is manual and does not change the other profile's login.`);
 			if (!confirmed) { switching = false; return; }
-			if (!ctx.isIdle() || ctx.hasPendingMessages()) return notify("A sessão voltou a trabalhar. Tente trocar quando estiver ociosa.");
+			if (!ctx.isIdle() || ctx.hasPendingMessages()) return notify("The session is busy again. Try switching when it is idle.");
 			const previous = process.env.CLAUDE_CONFIG_DIR;
 			try {
 				restoreDirectory(profile.directory);
 				if (!(await pi.setModel(model))) {
 					restoreDirectory(previous);
-					return notify("Não foi possível selecionar o claude-bridge. O perfil anterior foi mantido.");
+					return notify("Could not select claude-bridge. The previous profile was kept.");
 				}
 			} catch {
 				restoreDirectory(previous);
-				return notify("Falha ao selecionar o claude-bridge. O perfil anterior foi mantido.");
+				return notify("Failed to select claude-bridge. The previous profile was kept.");
 			}
 			pi.events?.emit(ACCOUNT_CHANGED, { source: "manual" });
-			ctx.ui.notify(`${label(profile, account)}. A conversa continua nesta sessão.`, "info");
-			// O reload limpa sessões e subprocessos do bridge; o histórico do pi fica intacto.
+			ctx.ui.notify(`${label(profile, account)}. The conversation continues in this session.`, "info");
+			// Reload clears bridge sessions and subprocesses; Pi history stays intact.
 			try { await ctx.reload(); }
 			catch {
 				restoreDirectory(previous);
-				throw new Error("Falha ao recarregar o bridge; o perfil anterior foi restaurado. Use /reload antes de continuar.");
+				throw new Error("Failed to reload the bridge; the previous profile was restored. Use /reload before continuing.");
 			}
 		},
 	});

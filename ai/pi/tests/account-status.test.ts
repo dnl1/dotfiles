@@ -105,7 +105,7 @@ test("auto refreshes the account when a provider stream fails over", async (t) =
 	const h = harness(t);
 	h.ctx.model = { provider: "pi-auto-model", id: "auto" };
 	await h.start();
-	assert.match(h.statuses.at(-1)!, /aguardando rota/);
+	assert.match(h.statuses.at(-1)!, /^Account: Auto: waiting for a route$/);
 	await h.handlers.get("provider_stream_event")({ provider: "claude-bridge" }, h.ctx);
 	assert.match(h.statuses.at(-1)!, /trabalho/);
 	process.env.CLAUDE_CONFIG_DIR = h.personal;
@@ -164,7 +164,7 @@ test("switching selects the bridge and reloads without replacing the session or 
 	assert.equal(h.ctx.model.provider, "claude-bridge");
 	assert.equal(h.ctx.sessionManager.getSessionId(), "same-session");
 	assert.deepEqual(h.messages, [{ role: "user", content: "existing history" }]);
-	assert.match(h.confirmations[0], /histórico.*personal@example.test/);
+	assert.match(h.confirmations[0], /history.*personal@example.test/);
 });
 
 test("the refreshed runtime shows the personal account", async (t) => {
@@ -217,7 +217,7 @@ test("a different email than configured blocks the switch", async (t) => {
 	const h = harness(t);
 	h.setWrongPersonal(true);
 	await h.switchTo("pessoal");
-	assert.match(h.notifications.at(-1)!, /e-mail/);
+	assert.match(h.notifications.at(-1)!, /email does not match the configuration/);
 	assert.deepEqual(h.operations, []);
 });
 
@@ -251,7 +251,7 @@ test("a rejected model selection restores the previous account", async (t) => {
 test("failed reload restores the original profile environment", async (t) => {
 	const h = harness(t);
 	h.setReloadFails(true);
-	await assert.rejects(h.switchTo("pessoal"), /recarregar/);
+	await assert.rejects(h.switchTo("pessoal"), /reload the bridge/);
 	assert.equal(process.env.CLAUDE_CONFIG_DIR, h.work);
 });
 

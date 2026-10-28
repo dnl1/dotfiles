@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Build features or fixes test-first with a red-green loop and behavior-focused tests. Use for explicit TDD, 'escreva o teste antes da correção', 'red-green-refactor' and requests to write integration tests. Not for merely running an existing suite or summarizing test results. For a bug whose cause is unknown, diagnose it before starting implementation.
+description: Build features or fixes test-first with a red-green loop and behavior-focused tests. Use for explicit TDD, 'write the test before the fix', 'red-green-refactor' and requests to write integration tests. Not for merely running an existing suite or summarizing test results. For a bug whose cause is unknown, diagnose it before starting implementation.
 ---
 
 # Test-Driven Development

@@ -129,7 +129,7 @@ for (const options of [{ personalLogin: false }, { wrongEmail: true }, { apiLogi
     assert.equal((await h.run()).continue, true);
     assert.equal(h.ctx.model, sol);
     assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
-    assert.match(h.notifications.join("\n"), /pessoal fora da rotação/);
+    assert.match(h.notifications.join("\n"), /pessoal excluded from rotation/);
   });
 }
 
@@ -158,7 +158,7 @@ test("invalid or duplicate identities fail closed instead of sharing quota", asy
   const h = harness(t);
   h.config.pessoal.expectedEmail = h.config.trabalho.expectedEmail;
   h.writeConfig();
-  assert.throws(accountConfig, /distintos/);
+  assert.throws(accountConfig, /distinct directories and email addresses/);
   await h.run();
   assert.equal(h.ctx.model, sol);
   assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
@@ -250,7 +250,7 @@ test("the fallback marker must sit once between subscriptions", async (t) => {
   for (const rotation of [["fallback"], ["fallback", "pessoal"], ["trabalho", "fallback"], ["trabalho", "fallback", "fallback", "pessoal"]]) {
     h.config.rotation = rotation;
     h.writeConfig();
-    assert.throws(accountConfig, /fallback|inválida/, JSON.stringify(rotation));
+    assert.throws(accountConfig, /fallback|Invalid/, JSON.stringify(rotation));
   }
   h.config.rotation = middle;
   h.writeConfig();
@@ -276,7 +276,7 @@ test("fallback in the middle: work -> Sol -> personal, then back up as each limi
   const state = last(h, "claude-account-rotation");
   assert.equal(state.active, "pessoal");
   assert.equal(state.blocked.fallback.nextAt, c.now() + 31 * 60_000);
-  assert.equal(h.statuses.get("claude-quota-return"), "Claude pessoal (reserva): sai em 31 min");
+  assert.equal(h.statuses.get("claude-quota-return"), "Claude pessoal (reserve): leave in 31 min");
 
   c.set(c.now() + 10 * 60_000);
   await h.tick();
@@ -310,7 +310,7 @@ test("the personal reserve goes straight back to work when work resets before So
   assert.equal(h.ctx.model, claude);
   assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
   assert.equal(last(h, "claude-account-rotation").active, "trabalho");
-  assert.match(h.notifications.at(-1), /trabalho disponível de novo/);
+  assert.match(h.notifications.at(-1), /trabalho is available again/);
   await h.run("", "completed");
   assert.equal(last(h, "claude-account-rotation").blocked.trabalho, undefined);
 });
@@ -326,7 +326,7 @@ test("with work, Sol and personal all exhausted, the error stays and nothing loo
   assert.equal(h.switches.length, switches);
   assert.equal(h.ctx.model, claude);
   assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
-  assert.match(h.notifications.at(-1), /nenhuma assinatura da rotação está disponível/);
+  assert.match(h.notifications.at(-1), /no subscription in the rotation is available/);
   assert.ok(last(h, "claude-account-rotation").blocked.pessoal);
 });
 
@@ -337,7 +337,7 @@ for (const options of [{ personalLogin: false }, { wrongEmail: true }, { apiLogi
     assert.equal(await h.run(codexQuota), undefined);
     assert.equal(h.ctx.model, sol);
     assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
-    assert.match(h.notifications.join("\n"), /pessoal fora da rotação/);
+    assert.match(h.notifications.join("\n"), /pessoal excluded from rotation/);
   });
 }
 

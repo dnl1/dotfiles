@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: Interview the user in rounds to stress-test an idea, plan or decision before acting. Use when they explicitly request 'grill me', 'questione minhas premissas', 'me entreviste' or a thorough challenge of their reasoning. Not for ordinary implementation, routine clarification or a general request to review a plan.
+description: Interview the user in rounds to stress-test an idea, plan or decision before acting. Use when they explicitly request 'grill me', 'challenge my assumptions', 'interview me' or a thorough challenge of their reasoning. Not for ordinary implementation, routine clarification or a general request to review a plan.
 ---
 
 Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.

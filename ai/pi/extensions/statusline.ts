@@ -181,7 +181,7 @@ function renderTop(
 	// A stream can fail over without changing the virtual model or its planned route status.
 	const route = ctx.model?.provider === AUTO_PROVIDER && observedRoute ? observedRoute : selectedRoute(ctx, autoStatus);
 	const model = ctx.model?.provider === AUTO_PROVIDER
-		? route ? `${route.id} (auto)` : "Auto: aguardando rota"
+		? route ? `${route.id} (auto)` : "Auto: waiting for a route"
 		: ctx.model?.name || ctx.model?.id || "Unknown Model";
 	const percent = ctx.getContextUsage()?.percent;
 	const usage = percent == null ? "?" : `${Math.round(percent)}%`;

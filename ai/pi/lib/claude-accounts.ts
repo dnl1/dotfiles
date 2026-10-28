@@ -5,7 +5,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const ACCOUNT_CHANGED = "claude-account-changed";
 export const ACCOUNT_NAMES = ["trabalho", "pessoal"] as const;
-// Marca, na rotação, a posição do modelo de --usage-fallback. As contas depois dela são reserva.
+// Marks the --usage-fallback model's position in the rotation. Accounts after it are reserves.
 export const FALLBACK_LINK = "fallback";
 export const OVERRIDES = [
   "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
@@ -37,10 +37,10 @@ export function accountConfig(): { profiles: Profile[]; rotation: Profile[]; res
   const names: unknown = config.rotation ?? [];
   if (!Array.isArray(names) || names.some((name) => name !== FALLBACK_LINK && !ACCOUNT_NAMES.includes(name)) ||
       new Set(names).size !== names.length) {
-    throw new Error("Rotação inválida em claude-accounts.json.");
+    throw new Error("Invalid rotation in claude-accounts.json.");
   }
   const split = names.indexOf(FALLBACK_LINK);
-  if (split >= 0 && (split === 0 || split === names.length - 1)) throw new Error("Na rotação, \"fallback\" precisa ficar entre duas assinaturas.");
+  if (split >= 0 && (split === 0 || split === names.length - 1)) throw new Error("In the rotation, \"fallback\" must sit between two subscriptions.");
   const pick = (list: string[]) => list.map((name) => profiles.find((profile) => profile.name === name)!);
   const rotation = pick(split < 0 ? names : names.slice(0, split));
   const reserve = pick(split < 0 ? [] : names.slice(split + 1));
@@ -48,7 +48,7 @@ export function accountConfig(): { profiles: Profile[]; rotation: Profile[]; res
   if (chain.length > 1 && (new Set(chain.map(directoryKey)).size !== chain.length ||
       chain.some((profile) => !profile.expectedEmail) ||
       new Set(chain.map((profile) => profile.expectedEmail!.toLowerCase())).size !== chain.length)) {
-    throw new Error("A rotação exige diretórios e e-mails distintos para as assinaturas.");
+    throw new Error("Rotation requires distinct directories and email addresses for each subscription.");
   }
   return { profiles, rotation, reserve };
 }
@@ -61,7 +61,7 @@ export function directoryKey(profile: Pick<Profile, "directory">): string {
 
 export function activeProfile(): Profile {
   const directory = process.env.CLAUDE_CONFIG_DIR ? expand(process.env.CLAUDE_CONFIG_DIR) : undefined;
-  return profiles().find((profile) => directoryKey(profile) === directoryKey({ directory })) ?? { name: "externo", directory };
+  return profiles().find((profile) => directoryKey(profile) === directoryKey({ directory })) ?? { name: "external", directory };
 }
 
 export function restoreDirectory(previous: string | undefined): void {
@@ -76,13 +76,13 @@ export async function identify(pi: ExtensionAPI, profile: Profile): Promise<Acco
     const status = JSON.parse(result.stdout);
     const account = { authenticated: result.code === 0 && status.loggedIn === true, email: clean(status.email), plan: clean(status.subscriptionType) };
     if (account.authenticated && (status.authMethod !== "claude.ai" || (status.apiProvider && status.apiProvider !== "firstParty"))) {
-      return { ...account, authenticated: false, error: "autenticação por API, não por assinatura Claude" };
+      return { ...account, authenticated: false, error: "API authentication instead of a Claude subscription" };
     }
     if (account.authenticated && profile.expectedEmail && account.email.toLowerCase() !== profile.expectedEmail.toLowerCase()) {
-      return { ...account, authenticated: false, error: `e-mail diferente do configurado (${account.email})` };
+      return { ...account, authenticated: false, error: `email does not match the configuration (${account.email})` };
     }
     return account;
   } catch {
-    return { authenticated: false, email: "", plan: "", error: "login não verificado" };
+    return { authenticated: false, email: "", plan: "", error: "login not verified" };
   }
 }

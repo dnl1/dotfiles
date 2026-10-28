@@ -24,7 +24,7 @@ function accountContext(ctx: ExtensionContext, profile: Profile): ExtensionConte
   });
 }
 
-// Só o bridge recebe IDs por conta. Histórico, ferramentas e hooks do Pi mantêm o ID original.
+// Only the bridge receives per-account IDs. Pi history, tools, and hooks keep the original ID.
 export function bridgeAPI(pi: ExtensionAPI): ExtensionAPI {
   return new Proxy(pi, {
     get(target, property) {
@@ -37,7 +37,7 @@ export function bridgeAPI(pi: ExtensionAPI): ExtensionAPI {
         return result;
       });
       if (property === "registerProvider") return (name: string, config: ProviderConfig) => {
-        if (name !== "claude-bridge" || !config.streamSimple) throw new Error("Contrato do claude-bridge incompatível com a rotação de contas.");
+        if (name !== "claude-bridge" || !config.streamSimple) throw new Error("The claude-bridge contract is incompatible with account rotation.");
         const stream = config.streamSimple;
         target.registerProvider(name, {
           ...config,
@@ -56,10 +56,10 @@ export function bridgeAPI(pi: ExtensionAPI): ExtensionAPI {
 export default async function (pi: ExtensionAPI) {
   const root = join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "npm/node_modules/pi-claude-bridge");
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  if (manifest.version !== "0.9.3") throw new Error("A rotação de contas foi validada com pi-claude-bridge@0.9.3. Confira a integração antes de atualizar.");
+  if (manifest.version !== "0.9.3") throw new Error("Account rotation was validated with pi-claude-bridge@0.9.3. Check the integration before upgrading.");
   const bridge = await import(pathToFileURL(join(realpathSync(root), "src/index.ts")).href);
   await bridge.default(bridgeAPI(pi));
   pi.registerFlag("claude-account-isolation", {
-    type: "boolean", default: true, description: "Isola as sessões do bridge por assinatura Claude.",
+    type: "boolean", default: true, description: "Isolates bridge sessions by Claude subscription.",
   });
 }

@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnose bugs, flaky behavior and performance regressions whose cause is not yet known. Use for 'investigue esse erro', 'por que está lento', 'falha às vezes', crashes and unexplained CI failures. Build a reproducible feedback loop before fixing. Not for merely running existing tests, an expected red TDD test or applying an already diagnosed mechanical fix.
+description: Diagnose bugs, flaky behavior and performance regressions whose cause is not yet known. Use for 'investigate this error', 'why is it slow', 'it fails intermittently', crashes and unexplained CI failures. Build a reproducible feedback loop before fixing. Not for merely running existing tests, an expected red TDD test or applying an already diagnosed mechanical fix.
 ---
 
 # Diagnosing Bugs

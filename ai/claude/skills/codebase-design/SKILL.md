@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Design module interfaces, dependency seams and architecture that is easier to test. Use for deep-module design or structural refactoring, including 'repense essa arquitetura', 'simplifique a interface desse serviço' and 'onde colocar os testes'. Not for visual UI design, routine bug diagnosis or a mechanical rename. Other skills may consult it for the shared module vocabulary.
+description: Design module interfaces, dependency seams and architecture that is easier to test. Use for deep-module design or structural refactoring, including 'rethink this architecture', 'simplify this service interface' and 'where should the tests go'. Not for visual UI design, routine bug diagnosis or a mechanical rename. Other skills may consult it for the shared module vocabulary.
 ---
 
 # Codebase Design
