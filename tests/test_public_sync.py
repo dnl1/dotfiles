@@ -44,7 +44,7 @@ class PublicSyncTests(unittest.TestCase):
         self.put("ai/README.md", "Public AI setup\n")
         self.put("README.md", "New public version\n")
         self.put(".tmux.conf", "set -g mouse on\n")
-        self.put(".gitconfig", "[user]\n  name = user\n  email = internal-only-marker@example.com\n")
+        self.put(".gitconfig", "[user]\n  name = Private User\n  email = internal-only-marker@example.com\n")
         self.commit(self.private)
 
     def command(self, *args, cwd=None, check=True):
@@ -86,11 +86,27 @@ class PublicSyncTests(unittest.TestCase):
         self.assertEqual((self.public / "ai/pi/settings.base.json").read_text(), "{}\n")
         self.assertTrue((self.public / ".tmux.conf").exists())
         self.assertIn("dnl1@users.noreply.github.com", (self.public / ".gitconfig").read_text())
+        self.assertIn("name = Dotfiles", (self.public / ".gitconfig").read_text())
+        self.assertNotIn("Private User", (self.public / ".gitconfig").read_text())
         self.assertIn("internal-only-marker", (self.private / ".gitconfig").read_text())
         self.assertEqual(before, self.command("git", "-C", str(self.private), "status", "--porcelain").stdout)
         email = self.command("git", "-C", str(self.public), "log", "-1", "--format=%ae %ce").stdout
         self.assertEqual(email.strip(), "dnl1@users.noreply.github.com dnl1@users.noreply.github.com")
         self.assertEqual(self.command("git", "-C", str(self.public), "config", "--get", "remote.origin.url").stdout.strip(), PUBLIC_URL)
+
+    def test_public_commit_ignores_private_messages_and_inherited_identity(self):
+        self.command("git", "-C", str(self.private), "-c", "user.name=Private User",
+                     "-c", "user.email=private@example.com", "commit", "--allow-empty",
+                     "-qm", "internal-only-marker")
+        self.env.update({
+            "GIT_AUTHOR_NAME": "Private User", "GIT_AUTHOR_EMAIL": "private@example.com",
+            "GIT_COMMITTER_NAME": "Private User", "GIT_COMMITTER_EMAIL": "private@example.com",
+        })
+        self.sync()
+        metadata = self.command("git", "-C", str(self.public), "log", "-1",
+                                "--format=%an|%ae|%cn|%ce|%s").stdout.strip()
+        self.assertEqual(metadata, "Dotfiles|dnl1@users.noreply.github.com|"
+                         "Dotfiles|dnl1@users.noreply.github.com|chore: sync public configuration")
 
     def test_push_hook_git_environment_does_not_retarget_the_public_clone(self):
         self.command("git", "clone", "-q", PUBLIC_URL, str(self.public))
@@ -131,6 +147,28 @@ class PublicSyncTests(unittest.TestCase):
         self.assertNotIn("internal-only-marker", result.stderr)
         self.assertEqual(before, self.remote_head())
         self.assertFalse(self.public.exists())
+
+    def test_private_rules_reject_credential_formats_without_printing_matches(self):
+        rules = (ROOT / "ai/work/public-deny.txt").read_text()
+        self.put("ai/work/public-deny.txt", rules)
+        examples = [
+            "-----BEGIN " + "PRIVATE KEY-----",
+            "github_pat_" + "x" * 30,
+            "AKIA" + "A" * 16,
+            "xoxb-" + "x" * 20,
+            "sk-" + "x" * 32,
+            "https://hooks.slack.com/" + "services/test",
+            "postgresql://" + "user:password@example.invalid/db",
+        ]
+        for example in examples:
+            with self.subTest(kind=examples.index(example)):
+                self.put("ai/leak.txt", example + "\n")
+                self.commit(self.private)
+                result = self.sync(check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ai/leak.txt", result.stderr)
+                self.assertNotIn(example, result.stdout + result.stderr)
+                self.assertFalse(self.public.exists())
 
     def test_file_names_are_checked_too(self):
         self.put("ai/internal-only-marker.txt", "safe contents\n")
