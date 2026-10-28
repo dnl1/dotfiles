@@ -163,8 +163,24 @@ rv 42                 # review PR #42 (re-run after a force-push)
 wtdone                # remove worktree, index and window; keep the branch
 ```
 
-Private shell helpers can be installed into `~/.config/zsh/devenv.d/*.zsh`.
-`devenv.zsh` loads them when present; the public setup requires none.
+Shell helpers in `~/.config/zsh/devenv.d/*.zsh` load with `devenv.zsh`.
+
+## Database commands
+
+```zsh
+withdb prod your-command
+```
+
+`withdb` reads the `DATABASE_URL` field from OpenBao (`kv/databases/production`
+for `prod`, `kv/databases/staging` for `stage`). If that fails, it warns and
+tries the encrypted GPG store at `~/.config/dbcreds/db.json.gpg`. If both fail,
+the command does not run. Credentials reach only the child environment.
+
+Set `DBCREDS_OPENBAO_PREFIX` and `DBCREDS_STORE` to use other paths. Optional
+`~/.config/dbcreds/config.zsh` can export those settings; keep credentials out
+of it and out of this repository. Authenticate with `bao` on each machine.
+`dbcreds-edit`, `dbcreds-unlock` and `dbcreds-lock` manage the GPG fallback.
+The helper needs zsh and jq, plus `bao` for OpenBao or GPG for the fallback.
 
 ## herdr — Git and PR popups
 

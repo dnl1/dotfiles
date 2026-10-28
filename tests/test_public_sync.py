@@ -69,10 +69,11 @@ class PublicSyncTests(unittest.TestCase):
         return self.command("git", "--git-dir", str(self.remote), "rev-parse", "main").stdout
 
     def test_snapshot_excludes_work_private_tests_untracked_and_uncommitted_content(self):
-        private_tests = ("tests/test_withdb.py", "tests/test_credential_instructions.py")
+        private_tests = ("tests/test_credential_instructions.py",)
         for path in private_tests:
             self.put(path, "internal-only-marker\n")
         self.put("tests/test_public_feature.py", "# Public regression fixture\n")
+        self.put("tests/test_withdb.py", "# Public credential helper checks\n")
         self.commit(self.private)
         self.put("ai/private-untracked.txt", "internal-only-marker\n")
         self.put("ai/pi/settings.base.json", "internal-only-marker\n")
@@ -82,6 +83,7 @@ class PublicSyncTests(unittest.TestCase):
         for path in private_tests:
             self.assertFalse((self.public / path).exists())
         self.assertTrue((self.public / "tests/test_public_feature.py").is_file())
+        self.assertTrue((self.public / "tests/test_withdb.py").is_file())
         self.assertFalse((self.public / "ai/private-untracked.txt").exists())
         self.assertEqual((self.public / "ai/pi/settings.base.json").read_text(), "{}\n")
         self.assertTrue((self.public / ".tmux.conf").exists())

@@ -637,6 +637,8 @@ fi
 # Loaded through ~/.config/ai/env.sh (written in the codebase-memory step), which
 # ~/.zshrc already sources — so nothing about it reaches the public .zshrc.
 install -m 0755 "$AI_DIR/bin/git-to-bare-container" "$HOME/.local/bin/git-to-bare-container"
+mkdir -p "$HOME/.config/zsh/devenv.d"
+install -m 0644 "$AI_DIR/shell/dbcreds.zsh" "$HOME/.config/zsh/devenv.d/dbcreds.zsh"
 
 # .ai-memory.toml scopes a container's worktrees to one ai-memory project; it
 # is a per-machine marker and never belongs in a commit.

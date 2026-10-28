@@ -81,6 +81,21 @@ else:
         self.assertTrue(any(command["key"] == "prefix+ctrl+g"
                             for command in CONFIG["keys"]["command"]))
 
+    def test_lazygit_runs_in_focused_directory_and_escape_closes_popup(self):
+        popup = next(command for command in CONFIG["keys"]["command"]
+                     if command["key"] == "prefix+ctrl+g")
+        self.assertEqual(popup["type"], "popup")
+        self.stub(self.home / "bin/lazygit", """
+import os, pathlib
+pathlib.Path(os.environ["DASH_LOG"]).write_text(os.getcwd())
+""")
+        result = subprocess.run(["sh", "-c", popup["command"]], env=self.env,
+                                cwd=self.home, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.log.read_text(), str(self.cwd))
+        self.assertIn("quitOnTopLevelReturn: true",
+                      (ROOT / "ai/lazygit/config.yml").read_text())
+
     def test_focused_repository_overrides_inherited_repository(self):
         result = self.launch()
         self.assertEqual(result.returncode, 0, result.stderr)
