@@ -68,12 +68,20 @@ class PublicSyncTests(unittest.TestCase):
     def remote_head(self):
         return self.command("git", "--git-dir", str(self.remote), "rev-parse", "main").stdout
 
-    def test_snapshot_excludes_work_untracked_and_uncommitted_content(self):
+    def test_snapshot_excludes_work_private_tests_untracked_and_uncommitted_content(self):
+        private_tests = ("tests/test_withdb.py", "tests/test_credential_instructions.py")
+        for path in private_tests:
+            self.put(path, "internal-only-marker\n")
+        self.put("tests/test_public_feature.py", "# Public regression fixture\n")
+        self.commit(self.private)
         self.put("ai/private-untracked.txt", "internal-only-marker\n")
         self.put("ai/pi/settings.base.json", "internal-only-marker\n")
         before = self.command("git", "-C", str(self.private), "status", "--porcelain").stdout
         self.sync()
         self.assertFalse((self.public / "ai/work").exists())
+        for path in private_tests:
+            self.assertFalse((self.public / path).exists())
+        self.assertTrue((self.public / "tests/test_public_feature.py").is_file())
         self.assertFalse((self.public / "ai/private-untracked.txt").exists())
         self.assertEqual((self.public / "ai/pi/settings.base.json").read_text(), "{}\n")
         self.assertTrue((self.public / ".tmux.conf").exists())
@@ -82,6 +90,26 @@ class PublicSyncTests(unittest.TestCase):
         self.assertEqual(before, self.command("git", "-C", str(self.private), "status", "--porcelain").stdout)
         email = self.command("git", "-C", str(self.public), "log", "-1", "--format=%ae %ce").stdout
         self.assertEqual(email.strip(), "dnl1@users.noreply.github.com dnl1@users.noreply.github.com")
+        self.assertEqual(self.command("git", "-C", str(self.public), "config", "--get", "remote.origin.url").stdout.strip(), PUBLIC_URL)
+
+    def test_push_hook_git_environment_does_not_retarget_the_public_clone(self):
+        self.command("git", "clone", "-q", PUBLIC_URL, str(self.public))
+        self.command("git", "-C", str(self.private), "remote", "add", "origin", "https://example.invalid/private.git")
+        before = self.command("git", "-C", str(self.private), "rev-parse", "HEAD").stdout
+        inherited = {
+            "GIT_DIR": str(self.private / ".git"),
+            "GIT_WORK_TREE": str(self.private),
+            "GIT_INDEX_FILE": str(self.private / ".git/index"),
+        }
+        self.env.update(inherited)
+        try:
+            result = self.sync(check=False)
+        finally:
+            for name in inherited:
+                self.env.pop(name)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.public / "README.md").read_text(), "New public version\n")
+        self.assertEqual(before, self.command("git", "-C", str(self.private), "rev-parse", "HEAD").stdout)
         self.assertEqual(self.command("git", "-C", str(self.public), "config", "--get", "remote.origin.url").stdout.strip(), PUBLIC_URL)
 
     def test_dry_run_lists_files_without_pushing(self):

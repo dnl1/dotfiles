@@ -1,0 +1,123 @@
+[
+  {
+    "id": "unknown-booking-bug",
+    "prompt": "A agenda ficou duplicada depois do último deploy e ainda não sabemos a causa. Investigue o erro antes de mexer no código.",
+    "expected": ["diagnosing-bugs"],
+    "avoid": ["grilling", "stark-backend"]
+  },
+  {
+    "id": "flaky-performance",
+    "prompt": "This endpoint used to take 100 ms and now sometimes takes 8 seconds. Find a reproducible explanation before proposing a fix.",
+    "expected": ["diagnosing-bugs"],
+    "avoid": ["stark-backend", "writing-pull-requests"]
+  },
+  {
+    "id": "explicit-test-first",
+    "prompt": "O arredondamento da comissão está errado e a causa já foi confirmada. Escreva o teste antes da correção e faça o ciclo red-green.",
+    "expected": ["tdd"],
+    "avoid": ["grilling"]
+  },
+  {
+    "id": "write-integration-tests",
+    "prompt": "Quero escrever testes de integração para o fluxo de cancelamento pela API pública. Vamos confirmar quais comportamentos precisam ficar protegidos.",
+    "expected": ["tdd"],
+    "avoid": ["stark-backend"]
+  },
+  {
+    "id": "module-interface",
+    "prompt": "Repense a interface do módulo de cobrança. Hoje cada chamada precisa conhecer dez detalhes internos e fica difícil testar.",
+    "expected": ["codebase-design"],
+    "avoid": ["frontend-design", "impeccable"]
+  },
+  {
+    "id": "dependency-seam",
+    "prompt": "Temos dois gateways de pagamento. Onde deve ficar a separação entre a regra de cobrança e as implementações de cada gateway?",
+    "expected": ["codebase-design"],
+    "avoid": ["grilling", "stark-backend"]
+  },
+  {
+    "id": "explicit-stress-test",
+    "prompt": "Questione minhas premissas sobre cobrar por profissional. Quero que você encontre os pontos fracos da ideia antes de implementarmos.",
+    "expected": ["grilling"],
+    "avoid": ["tdd"]
+  },
+  {
+    "id": "explicit-interview",
+    "prompt": "Grill me on this architecture proposal. Interview me in rounds and wait for my answers before treating decisions as settled.",
+    "expected": ["grilling"],
+    "avoid": ["writing-pull-requests"]
+  },
+  {
+    "id": "open-pr",
+    "prompt": "Abre o PR dessa branch seguindo o template do repositório e explica o que o revisor deve conferir.",
+    "expected": ["writing-pull-requests", "humanizer"],
+    "avoid": ["grilling"]
+  },
+  {
+    "id": "update-mr-description",
+    "prompt": "Atualize a descrição do merge request 1254 para incluir o risco da migração e o que realmente foi testado.",
+    "expected": ["writing-pull-requests", "humanizer"],
+    "avoid": ["docs"]
+  },
+  {
+    "id": "run-existing-suite",
+    "prompt": "Rode a suíte unitária que já existe e me diga quantos testes passaram. Não altere arquivos.",
+    "expected": [],
+    "avoid": ["tdd", "diagnosing-bugs", "grilling"]
+  },
+  {
+    "id": "expected-red-phase",
+    "prompt": "Estamos em TDD. O teste da nova regra falhou como esperado porque ainda não implementamos a validação. Continue para a implementação mínima.",
+    "expected": ["tdd"],
+    "avoid": ["diagnosing-bugs", "grilling"]
+  },
+  {
+    "id": "ordinary-api-change",
+    "prompt": "Adicione o campo opcional apelido no contrato desta API e mantenha o comportamento dos outros campos. Não é uma tarefa de acessibilidade.",
+    "expected": [],
+    "avoid": ["stark-backend", "frontend-design", "impeccable", "grilling"]
+  },
+  {
+    "id": "review-code-only",
+    "prompt": "Revise o diff da PR 1254 em busca de regressões. Não reescreva o título nem a descrição e não publique comentários.",
+    "expected": [],
+    "avoid": ["writing-pull-requests", "docs"]
+  },
+  {
+    "id": "visual-redesign",
+    "prompt": "A tela de planos está sem hierarquia visual. Melhore espaçamento e tipografia, preservando os textos, preços e identidade atual.",
+    "expected": [],
+    "expectedAny": ["impeccable", "frontend-design"],
+    "avoid": ["codebase-design", "grilling"]
+  },
+  {
+    "id": "keyboard-accessibility",
+    "prompt": "O foco sai do modal quando navego por Tab. Corrija a acessibilidade por teclado e confira o anúncio para leitor de tela.",
+    "expected": ["stark-frontend"],
+    "avoid": ["stark-backend", "stark-mobile", "stark-design"]
+  },
+  {
+    "id": "repository-readme",
+    "prompt": "Atualize o README deste repositório com o comando de migração novo, sem criar documentos fora do git.",
+    "expected": ["humanizer"],
+    "avoid": ["docs", "docx", "google-workspace"]
+  },
+  {
+    "id": "ordinary-plan-review",
+    "prompt": "Confira se este plano de implementação cobre os arquivos e testes necessários. Responda com os pontos que estão faltando.",
+    "expected": [],
+    "avoid": ["grilling", "docs", "tdd"]
+  },
+  {
+    "id": "retrieve-prior-decision",
+    "prompt": "O que decidimos anteriormente sobre armazenar o CPF dos clientes? Procure a decisão, não implemente nada.",
+    "expected": ["ai-memory-retrieval"],
+    "avoid": ["ai-memory-durable-pages", "ai-memory-learning-maintenance"]
+  },
+  {
+    "id": "pdf-file-task",
+    "prompt": "Junte os dois PDFs que estão na pasta Downloads e mantenha a ordem das páginas. Quero um único PDF de saída.",
+    "expected": ["pdf"],
+    "avoid": ["docx", "docs", "google-workspace"]
+  }
+]

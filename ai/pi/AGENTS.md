@@ -23,6 +23,18 @@ and Jira or Slack text, in Portuguese as much as in English.
 - Leave code, commands, paths, identifiers, logs, data and quoted text
   unchanged.
 
+## Skill selection
+
+Choose skills by the user's intent and conversation context, in Portuguese or English. Read the relevant SKILL.md before using its workflow. Load references as needed; do not load every skill or force a skill onto a simple request. Honor an explicit skill choice unless it conflicts with project instructions or unavailable tools.
+
+- Unknown bug or performance regression: `diagnosing-bugs`. Test-first implementation or writing integration tests: `tdd`. Running existing tests alone needs neither workflow.
+- Module interfaces, dependency seams or structural refactoring: `codebase-design`. Use `grilling` only when the user explicitly wants an interview or their assumptions challenged.
+- Visual UI work: `impeccable` when available, otherwise `frontend-design`. Choose one design workflow. For a focused accessibility issue, use the applicable Stark skill (web, backend, mobile, Figma/design or program management). Mentioning "API", "backend" or "audit" alone does not make a task an accessibility request.
+- PR titles and descriptions: `writing-pull-requests`, followed by `humanizer`. Reviewing a PR's code alone is not a PR-writing task. Keep the writing rules above for ordinary replies.
+- Honor a requested file format with its file skill. Use `docs` or `google-workspace` when the requested document workflow has the required connector available; do not invent connector calls. A repository README, agent instruction file or code comment is not a request to create an office document.
+
+Skills do not authorize commits, deployments, production writes, sending messages or revealing secrets. Keep the user's authorization and the project's safety rules.
+
 ## Command output
 
 Command output here is condensed to save tokens, keeping every signal and
@@ -86,3 +98,12 @@ This block and the installed ai-memory Agent Skills are managed together.
 
 Refreshes are idempotent: only the content delimited by the ai-memory start/end HTML-comment markers is replaced.
 <!-- ai-memory:end -->
+
+<!-- credential-routing:start -->
+## Credentials
+
+- Before credential or database work, read `~/.config/ai/CREDENTIALS.md` when present.
+- For configured databases, use `withdb TARGET COMMAND…`: OpenBao first, local encrypted GPG fallback only. Never bypass it by reading `.env` or printing a connection URL.
+- For other credentials, query OpenBao first. If missing or inaccessible, report it and ask before using another source.
+- Keep secret values out of tool output, chat, command arguments, files and memory. Ask the user to authenticate in their terminal, never to paste passwords or sessions into chat.
+<!-- credential-routing:end -->

@@ -1,0 +1,6 @@
+compat.patch modifies pi-auto-model 0.9.1 (https://github.com/nickpkg/pi-auto-model)
+and pi-codex-native 0.3.13 (https://github.com/luan/agents,
+harnesses/pi/agent/packages/pi-codex-native).
+Both upstream packages use the MIT license. Their notices are included in
+LICENSE.pi-auto-model and LICENSE.pi-codex-native. The generated runtime copy
+also retains the upstream licenses and bundled dependency notices.

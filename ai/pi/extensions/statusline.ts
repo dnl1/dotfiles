@@ -10,7 +10,7 @@
 import { basename, dirname, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { AUTO_PROVIDER, AUTO_STATUS, compactAutoStatus, selectedRoute } from "../lib/model-status.ts";
+import { AUTO_PROVIDER, AUTO_STATUS, compactAutoStatus, latestRoute, selectedRoute, type Route } from "../lib/model-status.ts";
 
 const RATE_LIMIT_PREFIX = "anthropic-ratelimit-unified-";
 const REFRESH_MS = 30_000;
@@ -33,6 +33,16 @@ export default function (pi: ExtensionAPI) {
 	let git: GitInfo | undefined;
 	let rateLimits: { fiveHour?: Window; sevenDay?: Window } = {};
 	let requestRender: (() => void) | undefined;
+	let observedRoute: Route | undefined;
+
+	function observeRoute(ctx: ExtensionContext, route: Route) {
+		if (ctx.model?.provider !== AUTO_PROVIDER || route.provider === AUTO_PROVIDER || !route.id) return;
+		const sameModel = observedRoute?.provider === route.provider && observedRoute.id === route.id;
+		const thinkingLevel = route.thinkingLevel ?? (sameModel ? observedRoute?.thinkingLevel : undefined);
+		if (sameModel && observedRoute?.thinkingLevel === thinkingLevel) return;
+		observedRoute = { ...route, thinkingLevel };
+		requestRender?.();
+	}
 
 	async function runGit(cwd: string, args: string[]): Promise<string | undefined> {
 		const res = await pi.exec("git", args, { cwd, timeout: GIT_TIMEOUT_MS });
@@ -89,7 +99,7 @@ export default function (pi: ExtensionAPI) {
 				render(width: number): string[] {
 					const extensionStatuses = footerData.getExtensionStatuses();
 					const lines = [
-						renderTop(ctx, theme, pi.getThinkingLevel(), rateLimits, extensionStatuses.get(AUTO_STATUS)),
+						renderTop(ctx, theme, pi.getThinkingLevel(), rateLimits, extensionStatuses.get(AUTO_STATUS), observedRoute),
 						renderBottom(theme, git, footerData.getGitBranch()),
 					];
 					const statuses = [...extensionStatuses.entries()]
@@ -103,7 +113,27 @@ export default function (pi: ExtensionAPI) {
 		void refreshGit(ctx.cwd);
 	}
 
-	pi.on("session_start", async (_event, ctx) => install(ctx));
+	pi.on("session_start", async (_event, ctx) => {
+		observedRoute = latestRoute(ctx);
+		install(ctx);
+	});
+	pi.on("before_agent_start", () => {
+		observedRoute = undefined;
+		requestRender?.();
+	});
+	pi.on("session_tree", (_event, ctx) => {
+		observedRoute = latestRoute(ctx);
+		requestRender?.();
+	});
+	pi.on("provider_stream_event", (event, ctx) => {
+		observeRoute(ctx, { provider: event.provider, id: event.model });
+	});
+	for (const event of ["message_start", "message_update", "message_end"] as const) {
+		pi.on(event, (event, ctx) => {
+			if (event.message.role !== "assistant") return;
+			observeRoute(ctx, { provider: event.message.provider, id: event.message.model, thinkingLevel: event.message.thinkingLevel });
+		});
+	}
 
 	pi.on("after_provider_response", async (event) => {
 		const headers = lowerKeys(event.headers);
@@ -117,8 +147,14 @@ export default function (pi: ExtensionAPI) {
 	for (const event of ["tool_execution_end", "agent_end", "user_bash"] as const) {
 		pi.on(event, async (_event, ctx) => void refreshGit(ctx.cwd));
 	}
-	pi.on("thinking_level_select", async () => requestRender?.());
-	pi.on("model_select", async () => requestRender?.());
+	pi.on("thinking_level_select", () => {
+		if (observedRoute) observedRoute.thinkingLevel = undefined;
+		requestRender?.();
+	});
+	pi.on("model_select", () => {
+		observedRoute = undefined;
+		requestRender?.();
+	});
 
 	pi.registerCommand("statusline", {
 		description: "Toggle the Claude-style statusline footer",
@@ -140,8 +176,10 @@ function renderTop(
 	thinkingLevel: string,
 	rateLimits: { fiveHour?: Window; sevenDay?: Window },
 	autoStatus?: string,
+	observedRoute?: Route,
 ): string {
-	const route = selectedRoute(ctx, autoStatus);
+	// A stream can fail over without changing the virtual model or its planned route status.
+	const route = ctx.model?.provider === AUTO_PROVIDER && observedRoute ? observedRoute : selectedRoute(ctx, autoStatus);
 	const model = ctx.model?.provider === AUTO_PROVIDER
 		? route ? `${route.id} (auto)` : "Auto: aguardando rota"
 		: ctx.model?.name || ctx.model?.id || "Unknown Model";
@@ -157,7 +195,7 @@ function renderTop(
 		.join(" | ");
 
 	const parts = [`🤖 ${model}`];
-	if (ctx.model?.reasoning || ctx.model?.provider === AUTO_PROVIDER) parts.push(`💪 ${thinkingLevel}`);
+	if (ctx.model?.reasoning || ctx.model?.provider === AUTO_PROVIDER) parts.push(`💪 ${route?.thinkingLevel ?? thinkingLevel}`);
 	parts.push(`🧠 ${usage}`, `💰 ${cost}`, `⏱️ ${rl}`);
 	return parts.join(" | ");
 }

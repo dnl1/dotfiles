@@ -1,0 +1,12 @@
+import { homedir } from "node:os";
+import { SettingsManager, DefaultPackageManager } from "@earendil-works/pi-coding-agent";
+const agentDir = `${homedir()}/.pi/agent`;
+const cwd = process.cwd();
+const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: true });
+const manager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
+const resources = await manager.resolve(async () => "skip");
+const relevant = resources.extensions.filter(r => /pi-routing-compat|\/pi-auto-model\/|\/pi-codex-native\//.test(r.path));
+const enabled = relevant.filter(r => r.enabled);
+if (enabled.filter(r => r.path.endsWith("/pi-routing-compat/entry.ts")).length !== 1) throw new Error("Missing local integration entry");
+if (enabled.some(r => r.path.includes("/npm/node_modules/pi-auto-model/") || r.path.includes("/npm/node_modules/pi-codex-native/"))) throw new Error("Duplicate original extension enabled");
+console.log(JSON.stringify({ localIntegrationEnabled: true, enabledExtensions: enabled.map(r => r.path), originalExtensionEnabled: false }));

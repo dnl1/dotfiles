@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 # ai-team — tmux session with N opencode agents + 1 monitor pane
 #
+# DEPRECATED: no longer maintained. Use pi inside herdr instead (README, "Pi + herdr").
+#
 # Usage:
 #   ai-team [action] [N] ["prompt"]
 #
@@ -50,6 +52,11 @@ fi
 USER_PROMPT="$*"
 
 MONITOR_IDX=$N_AGENTS   # monitor is always last pane
+
+# hydrate-monitor runs from a tmux hook, where nobody would read the notice.
+if [[ "$ACTION" != "hydrate-monitor" ]]; then
+  print -u2 'ai-team is deprecated: use pi inside herdr instead (dotfiles README, "Pi + herdr").'
+fi
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

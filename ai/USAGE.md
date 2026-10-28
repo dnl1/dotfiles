@@ -357,8 +357,9 @@ Calendar connectors belong to the claude.ai account, not these dotfiles.
 ## OpenCode
 
 ai-memory and codebase-memory-mcp are wired into OpenCode too. `ai-team`
-starts a tmux session of OpenCode agents (root README, *ai-team*). Run
-`ai-memory doctor` in a repo to confirm its sessions are being captured.
+starts a tmux session of OpenCode agents (root README, *ai-team*); it is
+deprecated, so use pi inside herdr instead. Run `ai-memory doctor` in a repo
+to confirm its sessions are being captured.
 
 ## Keeping both machines in step
 

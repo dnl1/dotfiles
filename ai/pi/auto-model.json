@@ -34,7 +34,8 @@
       "when": { "trigger": "user" },
       "then": {
         "prefer": ["claude-bridge/claude-opus-5-5"],
-        "exclude": ["ollama-local/*"]
+        "exclude": ["ollama-local/*"],
+        "thinking": "xhigh"
       }
     }
   ],
