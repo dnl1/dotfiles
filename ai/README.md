@@ -199,6 +199,18 @@ gh + ssh available, and the rest of `$HOME` hidden (see the header of
 `ai-jail/<OS>.toml` for the exact list). Accident prevention, not a security
 boundary — it is what makes `--dangerously-skip-permissions` tolerable.
 
+- `ai-jail pi` maps this checkout's `ai/pi` directory read-only so installed
+  extension symlinks resolve, and hides the jail's status bar so Pi owns its
+  footer. The Pi preset enables `terminal_passthrough` for OSC 52 clipboard
+  access and passes `HERDR_PANE_ID` and `PI_CLIPBOARD_OSC52` when set. This
+  exposes terminal clipboard, query and parser access to sandboxed processes;
+  filesystem restrictions remain in place. `--no-status-bar` alone does not
+  unblock copying. Check with `python3 -m unittest discover -s tests -p 'test_pi_jail.py'`
+  (the real PTY test requires Linux and bubblewrap).
+- Pi shares `~/.pi`, `~/.claude`, `~/.claude.json`, `~/.claude-pessoal` and
+  `~/.codex` read-write, including existing logins and token refreshes. The
+  native Claude executable under `~/.local/share/claude` is mapped read-only.
+  Restart `ai-jail pi` after map changes; `/reload` cannot change mounts.
 - **macOS login:** Claude keeps its OAuth token in the Keychain, which the jail
   cannot reach (ai-jail issue #44). Once: `claude setup-token`, put
   `CLAUDE_CODE_OAUTH_TOKEN=<token>` in `~/.config/ai-jail/claude.env`

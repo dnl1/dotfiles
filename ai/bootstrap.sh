@@ -814,11 +814,11 @@ else
   [ -f "$claude_env" ] && env_line="env_from_file = [\"$claude_env\"]"
   # Map entries for paths this machine does not have are dropped: a missing
   # map is an error to ai-jail, and installs differ (e.g. the Docker wrapper).
-  rendered="$(python3 - "$AI_DIR/ai-jail/$OS.toml" "$HOME" "$env_line" <<'PY'
+  rendered="$(python3 - "$AI_DIR/ai-jail/$OS.toml" "$HOME" "$env_line" "$AI_DIR" <<'PY'
 import os, re, sys
-template, home, env_line = sys.argv[1:4]
+template, home, env_line, ai_dir = sys.argv[1:5]
 out = []
-for line in open(template).read().replace("__HOME__", home).replace("__ENV_FROM_FILE__", env_line).splitlines():
+for line in open(template).read().replace("__HOME__", home).replace("__AI_DIR__", ai_dir).replace("__ENV_FROM_FILE__", env_line).splitlines():
     m = re.match(r'\s*"(/[^"]+)",\s*$', line)
     if m and not os.path.exists(m.group(1)):
         continue

@@ -25,9 +25,50 @@ ro_maps = [
   "__HOME__/.local/bin",
   "__HOME__/.nvm",
   "__HOME__/.config/ai-mcp",
+  "__HOME__/.config/ai",
+  "__HOME__/.config/openbao",
+  "__HOME__/.vault-token",
+  "__HOME__/.local/share/ai-tools",
   "__HOME__/Library/Caches/ms-playwright",
 ]
 rw_maps = [
+  "__HOME__/.pi",
+  "/opt/homebrew/var/codebase-memory-mcp",
+  "__HOME__/Library/Application Support/ai-memory",
+  "__HOME__/.npm",
+  "__HOME__/.cache/uv",
+  "__HOME__/.local/share/uv",
+]
+
+[commands.pi]
+network = true
+worktree = true
+github = true
+ssh = true
+# Pi owns its footer and needs OSC 52 for terminal clipboard access.
+no_status_bar = true
+terminal_passthrough = true
+env_pass = ["HERDR_PANE_ID", "PI_CLIPBOARD_OSC52"]
+ro_maps = [
+  "__AI_DIR__/pi",
+  "__HOME__/.local/share/claude",
+  "__HOME__/Applications/ai-memory",
+  "__HOME__/.local/bin",
+  "__HOME__/.nvm",
+  "__HOME__/.config/ai-mcp",
+  "__HOME__/.config/ai",
+  "__HOME__/.config/openbao",
+  "__HOME__/.vault-token",
+  "__HOME__/.local/share/ai-tools",
+  "__HOME__/Library/Caches/ms-playwright",
+]
+rw_maps = [
+  "__HOME__/.pi",
+  # Share provider sessions instead of copying tokens; allow login refreshes.
+  "__HOME__/.claude",
+  "__HOME__/.claude.json",
+  "__HOME__/.claude-pessoal",
+  "__HOME__/.codex",
   "/opt/homebrew/var/codebase-memory-mcp",
   "__HOME__/Library/Application Support/ai-memory",
   "__HOME__/.npm",

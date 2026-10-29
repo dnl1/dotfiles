@@ -75,6 +75,30 @@ async function harness(t, initial = auto) {
   };
 }
 
+test("the footer shows a lock and jailed tag only for the ai-jail prompt", async (t) => {
+  const original = process.env.PS1;
+  t.after(() => {
+    if (original === undefined) delete process.env.PS1;
+    else process.env.PS1 = original;
+  });
+  const h = await harness(t, claude);
+  for (const prompt of [undefined, "host $ ", "(jailbreak) $ ", "(jail) \\w \\$ "]) {
+    if (prompt === undefined) delete process.env.PS1;
+    else process.env.PS1 = prompt;
+    const line = h.render()[0];
+    if (prompt === "(jail) \\w \\$ ") {
+      assert.match(line, /^🔒 jailed \| 🤖 Claude Opus/);
+      for (const width of [12, 40, 80]) {
+        assert.match(h.render(width)[0], /^🔒 jailed/);
+        assert.ok(h.render(width).every((row) => visibleWidth(row) <= width));
+      }
+    } else {
+      assert.doesNotMatch(line, /🔒|jailed/);
+      assert.match(line, /^🤖 Claude Opus/);
+    }
+  }
+});
+
 test("manual model switches update the installed footer immediately", async (t) => {
   const h = await harness(t, claude);
   assert.match(h.render()[0], /🤖 Claude Opus/);
