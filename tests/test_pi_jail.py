@@ -48,7 +48,7 @@ class PiJailTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "linux" and shutil.which("ai-jail") and shutil.which("bwrap"),
                          "requires Linux, ai-jail and bubblewrap")
-    def test_real_pi_preset_loads_symlinks_and_forwards_clipboard(self):
+    def test_real_direct_pi_preset_preserves_terminal_and_shared_state(self):
         jail = shutil.which("ai-jail")
         with tempfile.TemporaryDirectory(prefix="pi-jail-") as directory:
             base = Path(directory).resolve()
@@ -106,7 +106,7 @@ printf '\\033[?1049l'
             master, slave = pty.openpty()
             try:
                 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-                with subprocess.Popen([jail, "pi"], env=env, cwd=project,
+                with subprocess.Popen([jail, "--exec", "pi"], env=env, cwd=project,
                                       stdin=slave, stdout=slave, stderr=slave) as child:
                     os.close(slave)
                     slave = None
@@ -128,6 +128,8 @@ printf '\\033[?1049l'
                     self.assertEqual(child.wait(), 0, "Pi resources, provider logins or terminal support are missing")
                     self.assertIn(b"\x1b]52;c;cGktamFpbC1xYQ==\x07", data)
                     self.assertIn(b"\x1b[?1006h", data)
+                    self.assertIn(b"\x1b[?1049h", data)
+                    self.assertIn(b"\x1b[?1049l", data)
                     for path in auth_paths:
                         self.assertEqual((home / path).read_text(), "synthetic-refreshed")
             finally:

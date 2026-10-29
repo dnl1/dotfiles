@@ -199,9 +199,11 @@ gh + ssh available, and the rest of `$HOME` hidden (see the header of
 `ai-jail/<OS>.toml` for the exact list). Accident prevention, not a security
 boundary — it is what makes `--dangerously-skip-permissions` tolerable.
 
-- `ai-jail pi` maps this checkout's `ai/pi` directory read-only so installed
-  extension symlinks resolve, and hides the jail's status bar so Pi owns its
-  footer. The Pi preset enables `terminal_passthrough` for OSC 52 clipboard
+- Start Pi with `ai-jail --exec pi`. This bypasses ai-jail's VT parser and
+  status bar, preserving Pi's full-screen rendering. Hiding the status bar
+  alone leaves the parser active and still changes the layout. The Pi preset
+  maps this checkout's `ai/pi` directory read-only so installed extension
+  symlinks resolve, and enables `terminal_passthrough` for OSC 52 clipboard
   access and passes `HERDR_PANE_ID` and `PI_CLIPBOARD_OSC52` when set. This
   exposes terminal clipboard, query and parser access to sandboxed processes;
   filesystem restrictions remain in place. `--no-status-bar` alone does not
@@ -210,7 +212,7 @@ boundary — it is what makes `--dangerously-skip-permissions` tolerable.
 - Pi shares `~/.pi`, `~/.claude`, `~/.claude.json`, `~/.claude-pessoal` and
   `~/.codex` read-write, including existing logins and token refreshes. The
   native Claude executable under `~/.local/share/claude` is mapped read-only.
-  Restart `ai-jail pi` after map changes; `/reload` cannot change mounts.
+  Restart `ai-jail --exec pi` after map changes; `/reload` cannot change mounts.
 - **OpenBao and DBHub in the jail (Linux).** ai-jail mounts its own `/etc/hosts`
   with only `localhost ai-sandbox`, so `openbao.local` stops resolving and
   `ai-dbhub` fails. The bootstrap writes `~/.config/ai-jail/hosts` with those
