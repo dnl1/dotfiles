@@ -17,10 +17,12 @@ __ENV_FROM_FILE__
 
 [commands.claude]
 network = true
-worktree = true
+# ai-jail ignores `worktree`; this is the key that exposes a linked worktree's Git dir.
+no_worktree = false
 github = true
 ssh = true
 ro_maps = [
+  "__DOTFILES__/openbao",
   "__HOME__/Applications/ai-memory",
   "__HOME__/.local/bin",
   "__HOME__/.nvm",
@@ -42,7 +44,7 @@ rw_maps = [
 
 [commands.pi]
 network = true
-worktree = true
+no_worktree = false
 github = true
 ssh = true
 # Pi owns its footer and needs OSC 52 for terminal clipboard access.
@@ -52,6 +54,7 @@ env_pass = ["HERDR_PANE_ID", "PI_CLIPBOARD_OSC52"]
 ro_maps = [
   "__AI_DIR__/pi",
   "__HOME__/.local/share/claude",
+  "__DOTFILES__/openbao",
   "__HOME__/Applications/ai-memory",
   "__HOME__/.local/bin",
   "__HOME__/.nvm",

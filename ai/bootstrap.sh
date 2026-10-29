@@ -805,6 +805,21 @@ if [ "$OS" = Linux ] && ! command -v bwrap &>/dev/null; then
   warn "ai-jail needs bubblewrap: sudo apt install bubblewrap"
 fi
 
+# ai-jail mounts its own /etc/hosts (localhost + its ai-sandbox hostname), which
+# drops openbao.local. The Linux template maps this file over it instead.
+if [ "$OS" = Linux ]; then
+  jail_hosts="$HOME/.config/ai-jail/hosts"
+  hosts_body="$(printf '127.0.0.1 localhost ai-sandbox\n::1       localhost ai-sandbox\n'
+    awk '{ sub(/#.*/, "") } { for (i = 2; i <= NF; i++) if ($i == "openbao.local") { print $1 " openbao.local"; break } }' /etc/hosts)"
+  if [ -f "$jail_hosts" ] && [ "$hosts_body" = "$(cat "$jail_hosts")" ]; then
+    skip "$jail_hosts up to date"
+  else
+    mkdir -p "$(dirname "$jail_hosts")"
+    printf '%s\n' "$hosts_body" > "$jail_hosts"
+    ok "wrote $jail_hosts"
+  fi
+fi
+
 jail_cfg="$HOME/.ai-jail"
 if [ -f "$jail_cfg" ] && ! head -1 "$jail_cfg" | grep -q 'ai-jail-managed'; then
   skip "$jail_cfg has local edits (no ai-jail-managed marker) — left alone"
@@ -818,9 +833,14 @@ else
 import os, re, sys
 template, home, env_line, ai_dir = sys.argv[1:5]
 out = []
-for line in open(template).read().replace("__HOME__", home).replace("__AI_DIR__", ai_dir).replace("__ENV_FROM_FILE__", env_line).splitlines():
+text = (open(template).read().replace("__HOME__", home).replace("__AI_DIR__", ai_dir)
+        .replace("__DOTFILES__", os.path.dirname(ai_dir))
+        .replace("__RUNTIME_DIR__", os.environ.get("XDG_RUNTIME_DIR", ""))
+        .replace("__ENV_FROM_FILE__", env_line))
+for line in text.splitlines():
     m = re.match(r'\s*"(/[^"]+)",\s*$', line)
-    if m and not os.path.exists(m.group(1)):
+    # A SOURCE:DEST map is kept when its source exists.
+    if m and not os.path.exists(m.group(1).split(":", 1)[0]):
         continue
     out.append(line)
 print("\n".join(out))

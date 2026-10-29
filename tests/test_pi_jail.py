@@ -36,6 +36,15 @@ class PiJailTests(unittest.TestCase):
                 self.assertIn("HERDR_PANE_ID", config["env_pass"])
                 self.assertIn("PI_CLIPBOARD_OSC52", config["env_pass"])
                 self.assertFalse(config.get("inherit_env", False))
+                self.assertIn("__DOTFILES__/openbao", config["ro_maps"])
+                # ai-jail ignores `worktree`; only `no_worktree = false` exposes a linked worktree.
+                presets = tomllib.loads(text.replace("__ENV_FROM_FILE__", ""))["commands"]
+                for preset in presets.values():
+                    self.assertIs(preset.get("no_worktree"), False)
+                    self.assertNotIn("worktree", preset)
+                if platform == "Linux":
+                    self.assertIn("__HOME__/.config/ai-jail/hosts:/etc/hosts", config["ro_maps"])
+                    self.assertIn("__RUNTIME_DIR__/moshi-hook.sock", config["ro_maps"])
 
     @unittest.skipUnless(sys.platform == "linux" and shutil.which("ai-jail") and shutil.which("bwrap"),
                          "requires Linux, ai-jail and bubblewrap")

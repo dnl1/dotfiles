@@ -211,6 +211,20 @@ boundary — it is what makes `--dangerously-skip-permissions` tolerable.
   `~/.codex` read-write, including existing logins and token refreshes. The
   native Claude executable under `~/.local/share/claude` is mapped read-only.
   Restart `ai-jail pi` after map changes; `/reload` cannot change mounts.
+- **OpenBao and DBHub in the jail (Linux).** ai-jail mounts its own `/etc/hosts`
+  with only `localhost ai-sandbox`, so `openbao.local` stops resolving and
+  `ai-dbhub` fails. The bootstrap writes `~/.config/ai-jail/hosts` with those
+  lines plus the host's `openbao.local` entry, and the template maps it over
+  `/etc/hosts`. Mapping the host's own `/etc/hosts` instead leaves `ai-sandbox`
+  unresolved and `getfqdn` waits 5 s. Re-run the bootstrap if the OpenBao
+  address changes. `~/.dotfiles/openbao` is mapped read-only so the
+  `openbao-access` symlink resolves.
+- `bao login` replaces `~/.vault-token` by rename, and a running jail keeps
+  seeing the old file: after logging in again outside, restart the jailed agent.
+- `/run` is a private tmpfs, so the moshi-hook socket
+  (`$XDG_RUNTIME_DIR/moshi-hook.sock`) is mapped on its own.
+- The worktree key is `no_worktree = false`; ai-jail ignores `worktree = true`,
+  and without it `git` fails inside a linked worktree.
 - **macOS login:** Claude keeps its OAuth token in the Keychain, which the jail
   cannot reach (ai-jail issue #44). Once: `claude setup-token`, put
   `CLAUDE_CODE_OAUTH_TOKEN=<token>` in `~/.config/ai-jail/claude.env`
