@@ -1,6 +1,7 @@
 """Exercise Pi's real jail preset with synthetic state and a captured terminal."""
 
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -19,6 +20,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = (ROOT / "ai/bootstrap.sh").read_text()
 RENDER = re.search(r'rendered="\$\((python3 - .*?)\n\)"', BOOTSTRAP, re.S).group(1)
+JAIL_CONFIG = BOOTSTRAP.split('jail_cfg="$HOME/.ai-jail"', 1)[1].split('# ── MCP credentials', 1)[0]
+JAIL_CONFIG = 'jail_cfg="$HOME/.ai-jail"' + JAIL_CONFIG
+PI_STATE = (
+    ".config/opencode", ".local/share/opencode", ".local/state/opencode", ".cache/opencode",
+    ".config/billion-context", ".local/share/billion-context", ".cache/billion-context",
+)
+FASTMCP_STATE = {"Darwin": "Library/Application Support/fastmcp", "Linux": ".local/share/fastmcp"}
 
 
 class PiJailTests(unittest.TestCase):
@@ -46,6 +54,54 @@ class PiJailTests(unittest.TestCase):
                 if platform == "Linux":
                     self.assertIn("__HOME__/.config/ai-jail/hosts:/etc/hosts", config["ro_maps"])
                     self.assertIn("__RUNTIME_DIR__/moshi-hook.sock", config["ro_maps"])
+
+    def test_pi_provider_and_mcp_paths_are_scoped_to_pi(self):
+        for platform in ("Linux", "Darwin"):
+            with self.subTest(platform=platform):
+                config = tomllib.loads((ROOT / f"ai/ai-jail/{platform}.toml").read_text()
+                                       .replace("__ENV_FROM_FILE__", ""))
+                pi, claude = config["commands"]["pi"], config["commands"]["claude"]
+                self.assertIn("__HOME__/.opencode/bin", pi["ro_maps"])
+                for path in (*PI_STATE, FASTMCP_STATE[platform]):
+                    self.assertIn(f"__HOME__/{path}", pi["rw_maps"])
+                    self.assertNotIn(f"__HOME__/{path}", claude["rw_maps"])
+                cbm = json.loads((ROOT / f"ai/claude/settings.{platform}.json").read_text())["env"]
+                for name in ("CBM_CACHE_DIR", "CBM_RUNTIME_DIR"):
+                    self.assertIn(f"{name}={cbm[name]}", pi["env_pass"])
+                self.assertNotIn("__HOME__/.cache", pi["rw_maps"])
+                self.assertNotIn("__HOME__", pi["rw_maps"])
+
+    def test_bootstrap_keeps_new_state_maps_on_a_fresh_home(self):
+        for platform in ("Linux", "Darwin"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory(prefix="pi-jail-render-") as directory:
+                base = Path(directory).resolve()
+                home, ai = base / "home with spaces", base / "checkout with spaces/ai"
+                home.mkdir()
+                (ai / "pi").mkdir(parents=True)
+                shutil.copytree(ROOT / "ai/ai-jail", ai / "ai-jail")
+                env = {"HOME": str(home), "PATH": f"{Path(sys.executable).parent}:/usr/bin:/bin",
+                       "AI_DIR": str(ai), "OS": platform, "XDG_RUNTIME_DIR": str(base / "runtime")}
+                script = ('set -eu\n'
+                          'ok() { :; }; skip() { :; }; warn() { :; }\n' + JAIL_CONFIG)
+                for _ in range(2):
+                    subprocess.run(["bash", "-c", script], env=env, text=True,
+                                   capture_output=True, check=True, timeout=10)
+                    rendered = (home / ".ai-jail").read_text()
+                    pi = tomllib.loads(rendered)["commands"]["pi"]
+                    for path in (*PI_STATE, FASTMCP_STATE[platform]):
+                        self.assertTrue((home / path).is_dir())
+                        self.assertIn(str(home / path), pi["rw_maps"])
+                    cbm = json.loads((ROOT / f"ai/claude/settings.{platform}.json").read_text()
+                                     .replace("__HOME__", str(home)))["env"]
+                    for name in ("CBM_CACHE_DIR", "CBM_RUNTIME_DIR"):
+                        self.assertIn(f"{name}={cbm[name]}", pi["env_pass"])
+                    self.assertNotIn("__HOME__", rendered)
+                    self.assertNotIn("__AI_DIR__", rendered)
+                local = "# locally managed\nno_save_config = true\n"
+                (home / ".ai-jail").write_text(local)
+                subprocess.run(["bash", "-c", script], env=env, text=True,
+                               capture_output=True, check=True, timeout=10)
+                self.assertEqual((home / ".ai-jail").read_text(), local)
 
     @unittest.skipUnless(sys.platform == "linux" and shutil.which("ai-jail") and shutil.which("bwrap"),
                          "requires Linux, ai-jail and bubblewrap")

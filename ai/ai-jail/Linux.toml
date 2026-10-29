@@ -61,8 +61,11 @@ env_pass = [
   "PI_JAILED=1",
   "HERDR_PANE_ID",
   "PI_CLIPBOARD_OSC52",
+  "CBM_CACHE_DIR=__HOME__/.local/state/codebase-memory-mcp/cache",
+  "CBM_RUNTIME_DIR=__HOME__/.local/state/codebase-memory-mcp/run",
 ]
 ro_maps = [
+  "__HOME__/.opencode/bin",
   "__AI_DIR__/pi",
   "__HOME__/.local/share/claude",
   "__HOME__/.config/ai-jail/hosts:/etc/hosts",
@@ -81,6 +84,14 @@ ro_maps = [
 ]
 rw_maps = [
   "__HOME__/.pi",
+  "__HOME__/.config/opencode",
+  "__HOME__/.local/share/opencode",
+  "__HOME__/.local/state/opencode",
+  "__HOME__/.cache/opencode",
+  "__HOME__/.config/billion-context",
+  "__HOME__/.local/share/billion-context",
+  "__HOME__/.cache/billion-context",
+  "__HOME__/.local/share/fastmcp",
   # Share provider sessions instead of copying tokens; allow login refreshes.
   "__HOME__/.claude",
   "__HOME__/.claude.json",

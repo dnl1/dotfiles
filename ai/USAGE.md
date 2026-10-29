@@ -23,7 +23,8 @@ says otherwise.
 ```bash
 herdr                                            # terminal workspace
 pi                                               # start inside a pane
-ai-jail --exec pi                                # sandboxed Pi, same terminal layout
+ai-jail --exec --terminal-passthrough pi          # Linux/WSL or locally patched macOS
+ai-jail pi                                      # proxy fallback on stock macOS 2.6.4
 claude                                           # standalone Claude Code
 ai-jail claude                                   # sandboxed session (see ai-jail)
 ai-jail claude --dangerously-skip-permissions    # sandboxed, no permission prompts
@@ -331,16 +332,23 @@ It prevents accidents but is not a security boundary. It is what makes
 `--dangerously-skip-permissions` tolerable.
 
 ```bash
-ai-jail --exec pi              # Pi in the jail, without the terminal proxy
-ai-jail claude                 # Claude in the jail (flags after it go to claude)
-ai-jail bash                   # a jailed shell, to see what the agent sees
-ai-jail status                 # the effective config
+ai-jail --exec --terminal-passthrough pi # Linux/WSL or locally patched macOS
+ai-jail pi                             # proxy fallback on stock macOS 2.6.4
+ai-jail claude                         # Claude in the jail (flags after it go to claude)
+ai-jail bash                           # a jailed shell, to see what the agent sees
+ai-jail status                         # the effective config
 ```
 
-Use `--exec` for Pi: ai-jail's terminal proxy changes its full-screen layout
-with `ai-jail pi`, even when the jail's status bar is hidden. The Pi preset
-already enables the terminal passthrough required by `--exec`; filesystem and
-network restrictions stay the same.
+Direct mode preserves Pi's full-screen layout. On macOS ai-jail 2.6.4 it
+requires the local exec-TTY patch; the stock build fails with `setRawMode EPERM`.
+The proxy fallback can change the layout. The bootstrap does not apply the
+local patch, and version 2.6.4 alone does not identify a patched build.
+
+Both Pi presets enable terminal passthrough for clipboard access, set
+`PI_JAILED=1` for the `🔒 jailed` indicator, and map OpenCode, billion-context
+and FastMCP state. They pass the shared codebase-memory cache and runtime paths
+explicitly. Only the named state directories are added; neither all of `$HOME`
+nor all of `~/.cache` is exposed.
 
 The config is `~/.ai-jail`, rendered from `ai-jail/<OS>.toml`. Edit the template
 and re-run the bootstrap; editing `~/.ai-jail` directly needs its first line

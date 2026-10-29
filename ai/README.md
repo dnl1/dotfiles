@@ -199,20 +199,28 @@ gh + ssh available, and the rest of `$HOME` hidden (see the header of
 `ai-jail/<OS>.toml` for the exact list). Accident prevention, not a security
 boundary — it is what makes `--dangerously-skip-permissions` tolerable.
 
-- Start Pi with `ai-jail --exec pi`. This bypasses ai-jail's VT parser and
-  status bar, preserving Pi's full-screen rendering. Hiding the status bar
-  alone leaves the parser active and still changes the layout. The Pi preset
-  maps this checkout's `ai/pi` directory read-only so installed extension
-  symlinks resolve, and enables `terminal_passthrough` for OSC 52 clipboard
-  access and passes `HERDR_PANE_ID` and `PI_CLIPBOARD_OSC52` when set. This
-  exposes terminal clipboard, query and parser access to sandboxed processes;
-  filesystem restrictions remain in place. `--no-status-bar` alone does not
-  unblock copying. Check with `python3 -m unittest discover -s tests -p 'test_pi_jail.py'`
+- On Linux/WSL and macOS with the local exec-TTY patch, start Pi with
+  `ai-jail --exec --terminal-passthrough pi`. This bypasses ai-jail's VT parser
+  and preserves Pi's full-screen layout. Stock macOS ai-jail 2.6.4 fails in
+  direct mode with `setRawMode EPERM`; `ai-jail pi` is a proxy fallback that can
+  change the layout. The bootstrap installs stock releases and does not apply
+  the local patch; both builds still report version 2.6.4.
+- Both Pi presets hide ai-jail's status bar, map this checkout's `ai/pi`
+  directory read-only so extension symlinks resolve, and enable
+  `terminal_passthrough` for OSC 52 clipboard access. They set `PI_JAILED=1`
+  for Pi's `🔒 jailed` indicator and pass `HERDR_PANE_ID` and
+  `PI_CLIPBOARD_OSC52` when set. This exposes terminal clipboard, query and
+  parser access to sandboxed processes; filesystem restrictions remain in
+  place. `--no-status-bar` alone does not unblock copying. Check with
+  `python3 -m unittest discover -s tests -p 'test_pi_jail.py'`
   (the real PTY test requires Linux and bubblewrap).
 - Pi shares `~/.pi`, `~/.claude`, `~/.claude.json`, `~/.claude-pessoal` and
   `~/.codex` read-write, including existing logins and token refreshes. The
-  native Claude executable under `~/.local/share/claude` is mapped read-only.
-  Restart `ai-jail --exec pi` after map changes; `/reload` cannot change mounts.
+  native Claude executable under `~/.local/share/claude` and the OpenCode binary
+  under `~/.opencode/bin` are mapped read-only. OpenCode state, billion-context
+  state and the platform's FastMCP cache are writable. The bootstrap creates
+  these state directories before rendering, so fresh installs keep their maps.
+  Restart jailed Pi after map changes; `/reload` cannot change mounts.
 - **OpenBao and DBHub in the jail (Linux).** ai-jail mounts its own `/etc/hosts`
   with only `localhost ai-sandbox`, so `openbao.local` stops resolving and
   `ai-dbhub` fails. The bootstrap writes `~/.config/ai-jail/hosts` with those
@@ -239,10 +247,11 @@ boundary — it is what makes `--dangerously-skip-permissions` tolerable.
   mapped read-write. The defaults could not work: CBM opens every directory from
   `/` down to its socket, and the jail denies opening `/private` on macOS and
   replaces `/tmp` on Linux. Every CBM process must see the same pair or it starts
-  a second daemon: Claude reads it from `settings.json`, shells from
-  `~/.config/ai/env.sh` (sourced by `~/.zshrc`), VS Code from its `mcp.json`. VS
-  Code launched from the Dock does not get it for its Copilot hooks — launch it
-  with `code` from a terminal. After moving, re-index each repo once.
+  a second daemon: Claude reads it from `settings.json`, jailed Pi from its
+  preset's `env_pass`, shells from `~/.config/ai/env.sh` (sourced by `~/.zshrc`),
+  and VS Code from its `mcp.json`. VS Code launched from the Dock does not get
+  it for its Copilot hooks. Launch it with `code` from a terminal. After moving,
+  re-index each repo once.
 - Browser MCPs (Playwright, Chrome DevTools) start in the jail; driving a real
   browser from there is untested.
 - To keep local edits to `~/.ai-jail`, delete its first line; the bootstrap

@@ -824,6 +824,16 @@ jail_cfg="$HOME/.ai-jail"
 if [ -f "$jail_cfg" ] && ! head -1 "$jail_cfg" | grep -q 'ai-jail-managed'; then
   skip "$jail_cfg has local edits (no ai-jail-managed marker) — left alone"
 else
+  # Keep writable Pi state maps on fresh installs; missing paths are dropped below.
+  mkdir -p "$HOME/.config/opencode" "$HOME/.local/share/opencode" \
+    "$HOME/.local/state/opencode" "$HOME/.cache/opencode" \
+    "$HOME/.config/billion-context" "$HOME/.local/share/billion-context" \
+    "$HOME/.cache/billion-context"
+  if [ "$OS" = Darwin ]; then
+    mkdir -p "$HOME/Library/Application Support/fastmcp"
+  else
+    mkdir -p "$HOME/.local/share/fastmcp"
+  fi
   claude_env="$HOME/.config/ai-jail/claude.env"
   env_line=""
   [ -f "$claude_env" ] && env_line="env_from_file = [\"$claude_env\"]"

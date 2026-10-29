@@ -103,7 +103,8 @@ Refreshes are idempotent: only the content delimited by the ai-memory start/end 
 ## Credentials
 
 - Before credential or database work, read `~/.config/ai/CREDENTIALS.md` when present.
-- For configured databases, use `withdb TARGET COMMAND…`: OpenBao first, local encrypted GPG fallback only. Never bypass it by reading `.env` or printing a connection URL.
+- For database queries, use the configured DBHub MCP (`search_objects` / `execute_sql`) first. If unavailable, report it and stop; never fall back automatically to SQL clients, ORM scripts or `withdb`. Direct access requires explicit authorization for the target and operation. Never read `.env`, retrieve a DSN yourself or print a connection URL. DBHub loads only its configured target credential from OpenBao inside its launcher; SQL tools stay read-only even when the selected database account has write privileges.
 - For other credentials, query OpenBao first. If missing or inaccessible, report it and ask before using another source.
-- Keep secret values out of tool output, chat, command arguments, files and memory. Ask the user to authenticate in their terminal, never to paste passwords or sessions into chat.
+- When authentication is needed, use `openbao-access ensure-login`. Inside Herdr, a noninteractive agent gets a dedicated Login OpenBao terminal pane on Mac or WSL; the user types the hidden password there. Never read that pane or send password input through agent tools. Outside Herdr, use the local terminal/native prompt; the GPG fallback keeps its own local prompt and Herdr request notification. Never ask for passwords through a chat/question tool.
+- Keep secret values out of tool output, chat, command arguments, files and memory. Ask the user to authenticate in their terminal or native password window, never to paste passwords or sessions into chat.
 <!-- credential-routing:end -->
