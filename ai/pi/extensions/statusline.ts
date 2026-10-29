@@ -195,8 +195,10 @@ function renderTop(
 		.join(" | ");
 
 	const parts = [`🤖 ${model}`];
-	// ai-jail sets this prompt in both its Linux and macOS sandboxes.
-	if (process.env.PS1?.startsWith("(jail) ")) parts.unshift(theme.fg("accent", "🔒 jailed"));
+	// PI_JAILED survives the managed shell launcher; PS1 keeps older configs working.
+	if (process.env.PI_JAILED === "1" || process.env.PS1?.startsWith("(jail) ")) {
+		parts.unshift(theme.fg("accent", "🔒 jailed"));
+	}
 	if (ctx.model?.reasoning || ctx.model?.provider === AUTO_PROVIDER) parts.push(`💪 ${route?.thinkingLevel ?? thinkingLevel}`);
 	parts.push(`🧠 ${usage}`, `💰 ${cost}`, `⏱️ ${rl}`);
 	return parts.join(" | ");

@@ -75,18 +75,30 @@ async function harness(t, initial = auto) {
   };
 }
 
-test("the footer shows a lock and jailed tag only for the ai-jail prompt", async (t) => {
-  const original = process.env.PS1;
+test("the footer shows a lock and jailed tag only for ai-jail", async (t) => {
+  const originalPS1 = process.env.PS1;
+  const originalJailed = process.env.PI_JAILED;
   t.after(() => {
-    if (original === undefined) delete process.env.PS1;
-    else process.env.PS1 = original;
+    if (originalPS1 === undefined) delete process.env.PS1;
+    else process.env.PS1 = originalPS1;
+    if (originalJailed === undefined) delete process.env.PI_JAILED;
+    else process.env.PI_JAILED = originalJailed;
   });
   const h = await harness(t, claude);
-  for (const prompt of [undefined, "host $ ", "(jailbreak) $ ", "(jail) \\w \\$ "]) {
+  for (const { prompt, marker, jailed } of [
+    { prompt: "host $ ", marker: "1", jailed: true },
+    { prompt: undefined, marker: undefined, jailed: false },
+    { prompt: "host $ ", marker: "0", jailed: false },
+    { prompt: "host $ ", marker: "true", jailed: false },
+    { prompt: "(jailbreak) $ ", marker: undefined, jailed: false },
+    { prompt: "(jail) \\w \\$ ", marker: undefined, jailed: true },
+  ]) {
     if (prompt === undefined) delete process.env.PS1;
     else process.env.PS1 = prompt;
+    if (marker === undefined) delete process.env.PI_JAILED;
+    else process.env.PI_JAILED = marker;
     const line = h.render()[0];
-    if (prompt === "(jail) \\w \\$ ") {
+    if (jailed) {
       assert.match(line, /^🔒 jailed \| 🤖 Claude Opus/);
       for (const width of [12, 40, 80]) {
         assert.match(h.render(width)[0], /^🔒 jailed/);

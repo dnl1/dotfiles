@@ -35,6 +35,7 @@ class PiJailTests(unittest.TestCase):
                 self.assertTrue(config["no_status_bar"])
                 self.assertIn("HERDR_PANE_ID", config["env_pass"])
                 self.assertIn("PI_CLIPBOARD_OSC52", config["env_pass"])
+                self.assertIn("PI_JAILED=1", config["env_pass"])
                 self.assertFalse(config.get("inherit_env", False))
                 self.assertIn("__DOTFILES__/openbao", config["ro_maps"])
                 # ai-jail ignores `worktree`; only `no_worktree = false` exposes a linked worktree.
@@ -91,6 +92,7 @@ done
 claude --version
 test "$HERDR_PANE_ID" = qa-pane
 test "$PI_CLIPBOARD_OSC52" = 0
+test "$PI_JAILED" = 1
 printf '\\033[?1049h\\033[?1000h\\033[?1006h'
 printf '\\033]52;c;cGktamFpbC1xYQ==\\007'
 sleep 0.1
