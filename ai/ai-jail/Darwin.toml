@@ -22,6 +22,10 @@ no_worktree = false
 github = true
 ssh = true
 ro_maps = [
+  "__HOME__/.gitconfig",
+  "__HOME__/.gitignore",
+  "__HOME__/.config/git/config",
+  "__HOME__/.config/git/ignore",
   "__DOTFILES__/openbao",
   "__HOME__/Applications/ai-memory",
   "__HOME__/.local/bin",
@@ -58,6 +62,10 @@ env_pass = [
   "CBM_RUNTIME_DIR=/opt/homebrew/var/codebase-memory-mcp/run",
 ]
 ro_maps = [
+  "__HOME__/.gitconfig",
+  "__HOME__/.gitignore",
+  "__HOME__/.config/git/config",
+  "__HOME__/.config/git/ignore",
   "__HOME__/.opencode/bin",
   "__AI_DIR__/pi",
   "__HOME__/.local/share/claude",

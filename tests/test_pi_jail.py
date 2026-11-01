@@ -51,6 +51,8 @@ class PiJailTests(unittest.TestCase):
                 for preset in presets.values():
                     self.assertIs(preset.get("no_worktree"), False)
                     self.assertNotIn("worktree", preset)
+                    for path in (".gitconfig", ".gitignore", ".config/git/config", ".config/git/ignore"):
+                        self.assertIn(f"__HOME__/{path}", preset["ro_maps"])
                 if platform == "Linux":
                     self.assertIn("__HOME__/.config/ai-jail/hosts:/etc/hosts", config["ro_maps"])
                     self.assertIn("__RUNTIME_DIR__/moshi-hook.sock", config["ro_maps"])
