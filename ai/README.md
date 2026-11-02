@@ -46,6 +46,7 @@ opt-in in public clones (see [Auto-sync](#auto-sync)).
 | pi OpenCode | `pi/settings.base.json` | Installs `opencode-pi@1.5.0`; the `opencode-cli` provider requires the OpenCode CLI on each machine. |
 | pi Ponytail | `pi/settings.base.json`, `pi/ponytail.json` | Installs `pi-ponytail@0.1.2` with the default set to `off`. Activate it per session with `/ponytail lite`. |
 | uv | brew / official installer | Runs the Python MCP servers (`uvx`). |
+| ub-mode | `ub-mode/revisions.tsv` + `ub-mode/install.sh` | Pinned shared skill and Crapper, Dryer and Mutator via uv. UML Viewer is opt-in; the workflow stays off until requested. See [ub-mode](#ub-mode). |
 | ai-jail | brew (this formula trusted, not the tap) / release tarball | `~/.ai-jail` rendered from `ai-jail/<OS>.toml`. |
 | MCP credentials | `mcp/` | `~/.config/ai-mcp/` (700) and `secrets.env` (600). Work-specific files come from the optional private overlay. Reached only through `~/.local/bin/ai-mcp-with-secrets`. |
 | Playwright | `mcp-servers.json` + `npx -p @playwright/mcp@X playwright install chromium` | Same pinned MCP and Chromium revision on both machines (WSL has no Chrome). |
@@ -61,6 +62,47 @@ opt-in in public clones (see [Auto-sync](#auto-sync)).
 Pi chooses skills from their descriptions; no separate router or model call is configured. `pi/AGENTS.md` distinguishes debugging from test-first work, visual design from module design, and accessibility from ordinary API work. The skill descriptions use English examples and explicit exclusions. Existing command names, profile keys and multilingual test fixtures keep their original spelling for compatibility and coverage. `frontend-design` loads from the existing official marketplace checkout, which also works on WSL without the Mac's symlink. Impeccable remains optional; machines without it use frontend-design.
 
 Run `node --test tests/pi-skills.test.mjs` to validate metadata and discovery with the installed Pi SDK. `pi/skill-routing-cases.json` contains 20 prompts and expected routes for manual checks after `/reload`; the offline tests do not measure model selection accuracy. Managed plugin and ai-memory descriptions are not rewritten. Changes to ordinary skills still require `/reload` in an active session.
+
+### ub-mode
+
+The bootstrap installs the [ub-mode](https://github.com/unclebob/ub-mode) skill
+and its Python tools from the source commits in `ub-mode/revisions.tsv`.
+Checkouts live in `~/.local/share/ub-mode/`; the shared skill is a symlink at
+`~/.claude/skills/ub-mode`. Pi already loads that directory. Reload an existing
+session, then use `/skill:ub-mode` in Pi or `/ub-mode` in Claude Code when wanted.
+The installer does not change global instructions or activate the workflow.
+
+Crapper, Dryer and Mutator use separate uv tool environments with an installed
+Python 3.11 or newer. Automatic Python downloads are disabled. Mutator also needs
+Crapper inside its own environment, supplied with uv's `--with` option.
+Re-running skips unchanged installations; changing Crapper's pin also rebuilds
+Mutator. Modified checkouts, conflicting skills and unmanaged viewer launchers
+are left untouched with an error. Review upstream changes before updating a pin.
+
+To install just this suite, without running the rest of the bootstrap:
+
+```bash
+bash ~/.dotfiles/ai/ub-mode/install.sh
+```
+
+UML Viewer is optional:
+
+```bash
+UB_MODE_WITH_UML_VIEWER=1 bash ~/.dotfiles/ai/ub-mode/install.sh
+```
+
+This adds its checkout and `~/.local/bin/uml-viewer`, without starting it.
+Install Java 21+ and Clojure CLI separately; the launcher also reuses an existing
+runtime under `~/.local/share/ub-mode/runtime/`. The viewer needs a graphical
+session, tmux and Grok. Upstream launches its Grok companion with
+`--yolo --trust`, so run it only in a trusted project. The installer does not
+download those runtimes or start Grok.
+
+The offline tests use temporary homes and local Git repositories:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_ub_mode.py'
+```
 
 ### pi usage-limit fallback
 

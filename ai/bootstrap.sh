@@ -608,6 +608,12 @@ else
   curl -LsSf https://astral.sh/uv/install.sh | sh && ok "installed to ~/.local/bin"
 fi
 
+# ── ub-mode ──────────────────────────────────────────────────────────────────
+
+step "ub-mode"
+bash "$AI_DIR/ub-mode/install.sh"
+ok "ub-mode skill and Python tools ready"
+
 # ── Playwright Chromium (for the playwright MCP entry) ────────────────────────
 # Installed through the MCP package's own `playwright` dependency, so the
 # browser revision always matches the pinned @playwright/mcp.

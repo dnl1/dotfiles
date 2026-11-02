@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Managed by dotfiles: ai/ub-mode/uml-viewer
+set -euo pipefail
+
+base="$HOME/.local/share/ub-mode"
+if [ -x "$base/runtime/java/bin/java" ]; then
+  export JAVA_HOME="$base/runtime/java"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+if [ -x "$base/runtime/clojure/bin/clojure" ]; then
+  clojure="$base/runtime/clojure/bin/clojure"
+else
+  clojure="$(command -v clojure)" || { echo "uml-viewer: install Clojure CLI and Java 21+ first" >&2; exit 1; }
+fi
+
+exec "$clojure" \
+  -Sdeps "{:deps {org.clojure/clojure {:mvn/version \"1.12.0\"} uml-viewer/uml-viewer {:local/root \"$base/uml-viewer\"} quil/quil {:mvn/version \"4.3.1563\"}}}" \
+  -M -m uml-viewer.main.uml-viewer "$@"
