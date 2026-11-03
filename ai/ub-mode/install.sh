@@ -10,14 +10,17 @@ for bin in git uv; do
 done
 
 install_repo() {
-  local name="$1" revision="$2" dir="$base/$1"
+  local name="$1" revision="$2" dir="$base/$1" url="${3:-https://github.com/unclebob/$1.git}"
   if [ ! -d "$dir/.git" ]; then
     git init -q "$dir"
-    git -C "$dir" remote add origin "https://github.com/unclebob/$name.git"
+    git -C "$dir" remote add origin "$url"
   fi
   if [ -n "$(git -C "$dir" status --porcelain)" ]; then
     echo "ub-mode: local changes in $dir; left untouched" >&2
     exit 1
+  fi
+  if [ "$(git -C "$dir" config --get remote.origin.url)" != "$url" ]; then
+    git -C "$dir" remote set-url origin "$url"
   fi
   if [ "$(git -C "$dir" rev-parse --verify HEAD 2>/dev/null || true)" != "$revision" ]; then
     git -C "$dir" fetch --quiet --depth=1 origin "$revision"
@@ -25,11 +28,11 @@ install_repo() {
   fi
 }
 
-while read -r name revision; do
+while read -r name revision url; do
   if [ "$name" = uml-viewer ] && [ "${UB_MODE_WITH_UML_VIEWER:-0}" != 1 ]; then
     continue
   fi
-  install_repo "$name" "$revision"
+  install_repo "$name" "$revision" "$url"
 done < "$SCRIPT_DIR/revisions.tsv"
 
 mkdir -p "$HOME/.claude/skills" "$HOME/.local/bin"

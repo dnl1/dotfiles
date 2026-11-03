@@ -72,6 +72,11 @@ Checkouts live in `~/.local/share/ub-mode/`; the shared skill is a symlink at
 session, then use `/skill:ub-mode` in Pi or `/ub-mode` in Claude Code when wanted.
 The installer does not change global instructions or activate the workflow.
 
+Crapper uses the pinned commit from [dnl1/crapper](https://github.com/dnl1/crapper),
+with C# analysis and Coverlet LCOV/Cobertura coverage. The optional third column
+in `ub-mode/revisions.tsv` selects a source repository; omitted URLs use
+`unclebob/<tool>`. Other tools keep their existing sources.
+
 Crapper, Dryer and Mutator use separate uv tool environments with an installed
 Python 3.11 or newer. Automatic Python downloads are disabled. Mutator also needs
 Crapper inside its own environment, supplied with uv's `--with` option.

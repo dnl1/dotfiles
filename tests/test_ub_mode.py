@@ -17,7 +17,7 @@ class UbModeTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="ub-mode test ")
         self.addCleanup(self.temp.cleanup)
-        self.home = Path(self.temp.name)
+        self.home = Path(self.temp.name).resolve()
         self.source = self.home / "checkout/ai/ub-mode"
         if (ROOT / "ai/ub-mode").exists():
             shutil.copytree(ROOT / "ai/ub-mode", self.source)
@@ -136,17 +136,27 @@ binary.chmod(0o755)
     def test_new_crapper_pin_updates_crapper_and_mutator_together(self):
         first = self.install()
         self.assertEqual(first.returncode, 0, first.stderr)
-        repo = self.repos / "crapper.git"
-        (repo / "SKILL.md").write_text("Updated upstream\n")
+        repo = self.repos / "fork/crapper.git"
+        self.git("clone", "-q", str(self.repos / "crapper.git"), str(repo))
+        self.git("config", "--global", f"url.{repo.parent.as_uri()}/.insteadOf",
+                 "https://github.com/dnl1/")
+        (repo / "SKILL.md").write_text("Updated fork\n")
         self.git("-C", str(repo), "-c", "user.name=Test", "-c",
                  "user.email=test@example.invalid", "commit", "-qam", "update")
         revision = self.git("-C", str(repo), "rev-parse", "HEAD").stdout.strip()
         self.revisions["crapper"] = revision
         self.write_revisions()
+        manifest = self.source / "revisions.tsv"
+        manifest.write_text(manifest.read_text().replace(
+            f"crapper\t{revision}\n",
+            f"crapper\t{revision}\thttps://github.com/dnl1/crapper.git\n"))
         result = self.install()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.git("-C", str(self.base / "crapper"), "rev-parse", "HEAD").stdout.strip(),
                          revision)
+        self.assertEqual(self.git("-C", str(self.base / "crapper"), "config",
+                                  "--get", "remote.origin.url").stdout.strip(),
+                         "https://github.com/dnl1/crapper.git")
         self.assertEqual([Path(call[-1]).name for call in self.calls()],
                          ["crapper", "dryer", "mutator", "crapper", "mutator"])
 
