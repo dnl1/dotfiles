@@ -74,6 +74,8 @@ class PublicSyncTests(unittest.TestCase):
             self.put(path, "internal-only-marker\n")
         self.put("tests/test_public_feature.py", "# Public regression fixture\n")
         self.put("tests/test_withdb.py", "# Public credential helper checks\n")
+        self.put("ai/work/skills/work-example/SKILL.md", "internal-only-marker\n")
+        self.put("ai/work/skills/work-example/references/workflow.md", "internal-only-marker\n")
         self.commit(self.private)
         self.put("ai/private-untracked.txt", "internal-only-marker\n")
         self.put("ai/pi/settings.base.json", "internal-only-marker\n")

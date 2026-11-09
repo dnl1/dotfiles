@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = (ROOT / "ai/bootstrap.sh").read_text()
 MCP_PY = re.search(r'python3 - "\$SECRETS".*?<<\'PY\' \|\n(.*?)\nPY', BOOTSTRAP, re.S).group(1)
 CREDENTIALS = BOOTSTRAP.split('step "MCP credentials"\n', 1)[1].split('# ── TypeScript', 1)[0]
+SKILLS = BOOTSTRAP.split('# Global skills', 1)[1].split('# ── ai-memory', 1)[0]
+SKILLS = SKILLS[SKILLS.index('for src in '):]
 HERDR = BOOTSTRAP.split('step "herdr, lazygit and gh-dash"\n', 1)[1].split('# lazygit reads', 1)[0]
 
 
@@ -42,6 +44,58 @@ class OverlayTests(unittest.TestCase):
     def stub(self, path, code):
         path.write_text(f"#!{sys.executable}\n" + code)
         path.chmod(0o755)
+
+    def make_skill(self, relative, body="# Example\n"):
+        source = self.ai / relative
+        source.mkdir(parents=True)
+        (source / "SKILL.md").write_text(body)
+        return source
+
+    def test_shared_skills_install_without_work_overlay(self):
+        self.make_skill("claude/skills/shared-example")
+        self.shell(SKILLS)
+        self.assertEqual((self.home / ".claude/skills/shared-example/SKILL.md").read_text(), "# Example\n")
+        self.assertFalse((self.ai / "work").exists())
+
+    def test_work_skills_include_support_files_and_keep_unrelated_skills(self):
+        self.make_skill("claude/skills/shared-example")
+        source = self.make_skill("work/skills/work-example", "# Work example\n")
+        (source / "references").mkdir()
+        (source / "references/workflow.md").write_text("# Workflow\n")
+        (source / "evals").mkdir()
+        (source / "evals/case.yaml").write_text("name: example\n")
+        unrelated = self.home / ".claude/skills/unrelated/SKILL.md"
+        unrelated.parent.mkdir(parents=True)
+        unrelated.write_text("# Keep this skill\n")
+        self.shell(SKILLS)
+        installed = self.home / ".claude/skills/work-example"
+        self.assertEqual((installed / "SKILL.md").read_text(), "# Work example\n")
+        self.assertEqual((installed / "references/workflow.md").read_text(), "# Workflow\n")
+        self.assertEqual((installed / "evals/case.yaml").read_text(), "name: example\n")
+        self.assertTrue((self.home / ".claude/skills/shared-example/SKILL.md").is_file())
+        self.assertEqual(unrelated.read_text(), "# Keep this skill\n")
+
+    def test_unchanged_work_skill_is_not_reinstalled(self):
+        self.make_skill("work/skills/work-example")
+        self.shell(SKILLS)
+        installed = self.home / ".claude/skills/work-example/SKILL.md"
+        before = installed.stat()
+        self.shell(SKILLS)
+        after = installed.stat()
+        self.assertEqual((after.st_ino, after.st_mtime_ns), (before.st_ino, before.st_mtime_ns))
+
+    def test_work_skill_updates_replace_removed_support_files(self):
+        source = self.make_skill("work/skills/work-example")
+        (source / "old.md").write_text("Old reference\n")
+        self.shell(SKILLS)
+        (source / "old.md").unlink()
+        (source / "SKILL.md").write_text("# Updated example\n")
+        (source / "new.md").write_text("New reference\n")
+        self.shell(SKILLS)
+        installed = self.home / ".claude/skills/work-example"
+        self.assertEqual((installed / "SKILL.md").read_text(), "# Updated example\n")
+        self.assertEqual((installed / "new.md").read_text(), "New reference\n")
+        self.assertFalse((installed / "old.md").exists())
 
     def test_public_credentials_without_work_overlay(self):
         self.shell(CREDENTIALS)

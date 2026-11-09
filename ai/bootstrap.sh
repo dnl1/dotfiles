@@ -96,10 +96,10 @@ else
   printf '@WRITING.md\n' >> "$HOME/.claude/CLAUDE.md" && ok "imported ~/.claude/WRITING.md from ~/.claude/CLAUDE.md"
 fi
 
-# Global skills, one directory each under claude/skills/. The installed copy is
-# replaced whenever it differs, like WRITING.md: edit a skill here, not in
-# ~/.claude/skills, or the next run puts the repo's version back.
-for src in "$AI_DIR"/claude/skills/*/; do
+# Global skills from the shared catalog and optional private work overlay.
+# The installed copy is replaced whenever it differs, like WRITING.md: edit
+# the source here, not ~/.claude/skills, or the next run restores this version.
+for src in "$AI_DIR"/claude/skills/*/ "$AI_DIR"/work/skills/*/; do
   [ -d "$src" ] || continue
   name="$(basename "$src")"
   dst="$HOME/.claude/skills/$name"
