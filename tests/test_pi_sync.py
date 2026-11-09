@@ -158,7 +158,7 @@ class BuildTests(unittest.TestCase):
         fake = self.root / 'missing agent'
         (fake / 'npm/node_modules/pi-auto-model').mkdir(parents=True)
         (fake / 'npm/node_modules/pi-auto-model/package.json').write_text('{"version":"0.0.0"}')
-        with self.assertRaisesRegex(RuntimeError, 'Install npm:pi-auto-model@0.9.1'):
+        with self.assertRaisesRegex(RuntimeError, 'Install npm:pi-auto-model@0.9.2'):
             builder.install(fake)
         self.assertFalse((fake / 'packages').exists())
 

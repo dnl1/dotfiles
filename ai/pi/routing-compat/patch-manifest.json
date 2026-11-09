@@ -12,8 +12,12 @@
     "patched_sha256": "4f806542d4466bbb1df2cc5fd2217e4f7e758ab0d08b963171fb3c8d7eb1f0d2"
   },
   "vendor/pi-auto-model/extensions/auto-model.ts": {
-    "original_sha256": "31596e53670e8975121a8f8c893f5451689822ff140ff7405624fe0993f162d4",
+    "original_sha256": "0d7138542c2d5cc6bdcb024e2db9a0ee0dc1f1141d6737387ccfb5b4b79387d6",
     "patched_sha256": "f72e07e8cb832f5604185778bac02a415f7cb485b6bb6020cc18e02d2cf50545"
+  },
+  "vendor/pi-auto-model/src/pi/auto-model.ts": {
+    "original_sha256": "a3bb259c087fb8e7ff20b0fc7f01c2ecf0ef933e2c4297b2878db65af78e8064",
+    "patched_sha256": "c82bce31c188f5b19c485409047009ec8c2314d759be658d960149802b023f5f"
   },
   "vendor/pi-codex-native/src/compaction/extension.ts": {
     "original_sha256": "c605c414fea0d57da1c994d6c65ef70c9f8321c859a62fbfcf1109b918321b57",

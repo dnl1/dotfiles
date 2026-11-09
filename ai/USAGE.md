@@ -34,7 +34,7 @@ The status line shows the model and effort level, context used, the worktree,
 the session cost, and the 5-hour / 7-day rate-limit usage with reset times.
 The configured base model is Opus 5.5 at `xhigh` effort
 (`claude/settings.base.json`, `pi/settings.base.json`). Pi also installs
-`pi-auto-model@0.9.1`, which enables routing by default for new sessions.
+`pi-auto-model@0.9.2`, which enables routing by default for new sessions.
 Use `/auto-model status` to inspect it, or `/auto-model off` and select a
 concrete model to keep a session fixed. Log in to each provider on that machine;
 credentials and routing history are not synced.

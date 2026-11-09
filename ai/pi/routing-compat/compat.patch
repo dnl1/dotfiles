@@ -161,7 +161,7 @@
  			handleSessionStart(_event, ctx, store);
  			await metrics.load(metricsPath);
  			await ensurePriceCache();
-@@ -654,20 +668,22 @@
+@@ -654,35 +668,30 @@
  	pi.on("context", safeHandler<ContextEvent>("context", async (event, ctx) => {
  		const sessionId = ctx.sessionManager.getSessionId();
  		if (!runAwaitingRoute.delete(sessionId) || !isAutoModel(ctx.model)) return;
@@ -171,6 +171,15 @@
  
  	pi.on("before_agent_start", safeHandler<BeforeAgentStartEvent>("before_agent_start", async (event, ctx) => {
  		runRouted.add(ctx.sessionManager.getSessionId());
+-		// Pi >= 1.4 also emits this for idle sendMessage(..., { triggerTurn }) runs:
+-		// messageType "custom" with `message` and no `prompt`. Route those on the
+-		// message text as extension turns (no prefix pins, no first-prompt credit).
+-		const custom = event as { messageType?: string; message?: unknown };
+-		if (custom.messageType === "custom") {
+-			const prompt = latestPromptText([custom.message] as ContextEvent["messages"]);
+-			await routeRun({ ...event, prompt, images: undefined }, ctx, false);
+-			return;
+-		}
 -		await routeRun(event, ctx, true);
 +		const custom = event.messageType === "custom";
 +		await routeRun(custom ? { prompt: latestPromptText([event.message] as ContextEvent["messages"]) } : event, ctx, !custom);
@@ -187,10 +196,15 @@
  		const config = configs.get(state.sessionId) ?? DEFAULT_CONFIG;
  		const allowPrefix = fromUserPrompt && !state.initialPromptHandled;
  		// A new user task must never inherit an earlier task's dispatch permission.
-@@ -676,0 +693,2 @@
+ 		pendingStreams.delete(state.sessionId);
+ 		if (fromUserPrompt) state.initialPromptHandled = true;
+ 		settleInterruptedTask(ctx, state);
 +		// A new user task gets a fresh retry budget; cooldowns still apply.
 +		if (fromUserPrompt) state.lastFailedRoute = undefined;
-@@ -721,7 +739,7 @@
+ 		const budgetWarning = budgetLedger.takeWarning();
+ 		if (budgetWarning) notifySafe(ctx, budgetWarning, "warning");
+ 		settlePendingActivation(state);
+@@ -730,7 +739,7 @@
  
  	// ─── Shared routing pipeline for execution and local previews ───
  	async function applyAutoRoute(
@@ -199,7 +213,7 @@
  		ctx: ExtensionContext,
  		state: SessionRuntimeState,
  		config: AutoModelConfig,
-@@ -1267,7 +1285,7 @@
+@@ -1276,7 +1285,7 @@
  	 * quota, budget, pin, or pool rules.
  	 */
  	function applyFallbackPlan(
@@ -208,7 +222,7 @@
  		ctx: ExtensionContext,
  		state: SessionRuntimeState,
  		config: AutoModelConfig,
-@@ -1712,7 +1730,7 @@
+@@ -1721,7 +1730,7 @@
  				return;
  			}
  			return {
@@ -217,7 +231,7 @@
  			};
  		} catch (error) {
  			notifySafe(ctx, `Pi Auto Model context failed: ${errorMessage(error)}`, "warning");
-@@ -1726,6 +1744,15 @@
+@@ -1735,6 +1744,15 @@
  			if (!contextIsCompatible(ctx)) {
  				return { cancel: true };
  			}
@@ -233,7 +247,7 @@
  			const state = stateForContext(store, ctx);
  			try {
  				const config = configs.get(state.sessionId) ?? DEFAULT_CONFIG;
-@@ -1784,6 +1811,7 @@
+@@ -1793,6 +1811,7 @@
  			clearAutoModelStatus(ctx);
  			await Promise.allSettled([metrics.flush(), quality.flush(), events.flush()]);
  			store.delete(ctx.sessionManager.getSessionId());
@@ -241,6 +255,16 @@
  			pendingStreams.delete(ctx.sessionManager.getSessionId());
  			routerHealth.delete(ctx.sessionManager.getSessionId());
  			runRouted.delete(ctx.sessionManager.getSessionId());
+--- a/vendor/pi-auto-model/src/pi/auto-model.ts
++++ b/vendor/pi-auto-model/src/pi/auto-model.ts
+@@ -26,6 +26,7 @@
+ 				id: AUTO_MODEL_ID,
+ 				name: "Pi Auto Model",
+ 				reasoning: true,
++				thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+ 				input: ["text", "image"],
+ 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+ 				contextWindow: 1_000_000,
 --- a/vendor/pi-codex-native/src/compaction/extension.ts
 +++ b/vendor/pi-codex-native/src/compaction/extension.ts
 @@ -1,4 +1,5 @@

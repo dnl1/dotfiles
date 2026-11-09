@@ -1,6 +1,6 @@
 # Pi routing and Codex compatibility
 
-The dotfiles bootstrap builds `~/.pi/agent/packages/pi-routing-compat` from the installed `pi-auto-model@0.9.1` and `pi-codex-native@0.3.13` packages. The repository contains the patch, hashes, installer and synthetic tests. It contains no vendored dependency tree, credentials or conversation history.
+The dotfiles bootstrap builds `~/.pi/agent/packages/pi-routing-compat` from the installed `pi-auto-model@0.9.2` and `pi-codex-native@0.3.13` packages. The repository contains the patch, hashes, installer and synthetic tests. It contains no vendored dependency tree, credentials or conversation history.
 
 ## Runtime
 
@@ -14,7 +14,7 @@ After applying changes, restart Pi. Existing session files are not rewritten or 
 
 ## Paging and Ponytail
 
-`@rochecompaan/pi-context-paging@0.3.9` remains installed but its extension and `contextPaging.enabled` are disabled. A regression test demonstrates that trimming history after a native Codex checkpoint produces `expected-pi-replay-mismatch`. Do not enable paging with this native replay implementation.
+`@rochecompaan/pi-context-paging@0.3.11` remains installed but its extension and `contextPaging.enabled` are disabled. A regression test demonstrates that trimming history after a native Codex checkpoint produces `expected-pi-replay-mismatch`. Do not enable paging with this native replay implementation.
 
 Ponytail is pinned to `0.1.2`. `ai/pi/ponytail.json` sets its default to `off` on both platforms. Use `/ponytail lite` for an explicit session choice. An explicit `PONYTAIL_DEFAULT_MODE` environment variable still takes precedence.
 

@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-PINS = {"pi-auto-model": "0.9.1", "pi-codex-native": "0.3.13"}
+PINS = {"pi-auto-model": "0.9.2", "pi-codex-native": "0.3.13"}
 RUNTIME_DEPS = ("partial-json", "proxy-from-env", "undici")
 ASSETS = ("package.json", "entry.ts", "dispatch-context.ts", "compat.patch", "patch-manifest.json", "test",
           "README.md", "NOTICE", "LICENSE.pi-auto-model", "LICENSE.pi-codex-native")
