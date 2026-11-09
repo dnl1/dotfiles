@@ -33,6 +33,7 @@ class PrPopupTests(unittest.TestCase):
             "HOME": str(self.home),
             "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
             "HERDR_ACTIVE_PANE_ID": "w2:p7",
+            "HERDR_BIN_PATH": str(binaries / "herdr"),
             "GH_REPO": "wrong/repository",
             "FAKE_REPO": "owner/current-repo",
             "FAKE_PANE": json.dumps({"result": {"pane": {
@@ -105,6 +106,17 @@ pathlib.Path(os.environ["DASH_LOG"]).write_text(os.getcwd())
         self.assertEqual(launched["args"], [
             "dash", "--config", str(self.home / ".config/gh-dash/config.yml"),
         ])
+
+    def test_popup_uses_server_binary_when_herdr_is_not_on_path(self):
+        runtime = self.home / "server herdr"
+        (self.home / "bin/herdr").rename(runtime)
+        self.env["HERDR_BIN_PATH"] = str(runtime)
+        self.env["PATH"] = str(self.home / "bin") + os.pathsep + os.defpath
+
+        result = self.launch()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.log.read_text())["cwd"], str(self.cwd))
 
     def test_respects_xdg_config_home(self):
         config_home = self.home / "custom config"

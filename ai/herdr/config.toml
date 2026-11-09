@@ -11,7 +11,7 @@ auto_switch = false
 key = "prefix+ctrl+g"
 type = "popup"
 description = "lazygit (popup)"
-command = "cd \"$(herdr pane get \"$HERDR_ACTIVE_PANE_ID\" | jq -r .result.pane.foreground_cwd)\" 2>/dev/null; exec lazygit"
+command = "cd \"$(\"${HERDR_BIN_PATH:-herdr}\" pane get \"$HERDR_ACTIVE_PANE_ID\" | jq -r .result.pane.foreground_cwd)\" 2>/dev/null; exec lazygit"
 width = "85%"
 height = "92%"
 
@@ -25,7 +25,7 @@ fail() {
   [ -t 0 ] && read -r _
   exit 1
 }
-pane=$(herdr pane get "$HERDR_ACTIVE_PANE_ID") || fail "herdr could not read the focused pane."
+pane=$("${HERDR_BIN_PATH:-herdr}" pane get "$HERDR_ACTIVE_PANE_ID") || fail "herdr could not read the focused pane."
 cwd=$(printf '%s' "$pane" | jq -er '.result.pane.foreground_cwd // .result.pane.cwd') || fail "the focused pane has no working directory."
 cd "$cwd" || fail "cannot enter $cwd."
 unset GH_REPO
