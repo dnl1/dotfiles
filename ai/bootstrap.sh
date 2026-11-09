@@ -466,7 +466,7 @@ else
 fi
 
 # ── pi ────────────────────────────────────────────────────────────────────────
-# AGENTS.md and pi/extensions/*.ts are SYMLINKED into ~/.pi/agent, so an edit
+# AGENTS.md, extensions, prompts and agents are SYMLINKED into ~/.pi/agent, so an edit
 # made from a pi session lands in this repo: commit and push it and the other
 # machine has it after its next sync (sync.sh pauses while it is uncommitted).
 # settings.json, claude-bridge.json and auto-model.json are merged instead,
@@ -496,16 +496,29 @@ link_pi() {
     skip "~/.pi/agent/$rel linked to the repo"
     return 0
   fi
-  if [ -e "$dst" ] && ! cmp -s "$src" "$dst"; then
-    cp -p "$dst" "$dst.bak-$(date +%s)"
-    warn "~/.pi/agent/$rel differed from the repo — backup kept next to it"
+  if [ -e "$dst" ] || [ -L "$dst" ]; then
+    local backup
+    mkdir -p "$PI_DIR/backups"
+    backup="$(mktemp -d "$PI_DIR/backups/link-XXXXXX")"
+    mv "$dst" "$backup/$(basename "$dst")"
+    warn "~/.pi/agent/$rel replaced — previous entry kept in $backup"
   fi
-  ln -sfn "$src" "$dst" && ok "linked ~/.pi/agent/$rel to the repo"
+  mkdir -p "$(dirname "$dst")"
+  ln -s "$src" "$dst" && ok "linked ~/.pi/agent/$rel to the repo"
 }
 link_pi AGENTS.md
 link_pi lib
 for src in "$AI_DIR"/pi/extensions/*.ts; do
+  [ -f "$src" ] || continue
   link_pi "extensions/$(basename "$src")"
+done
+for src in "$AI_DIR"/pi/extensions/*/; do
+  [ -f "$src/index.ts" ] || continue
+  link_pi "extensions/$(basename "$src")"
+done
+for src in "$AI_DIR"/pi/prompts/*.md "$AI_DIR"/pi/agents/*.md; do
+  [ -f "$src" ] || continue
+  link_pi "${src#"$AI_DIR/pi/"}"
 done
 
 # pi would also install a missing package on its first start; doing it here
