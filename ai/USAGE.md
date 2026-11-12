@@ -40,7 +40,11 @@ concrete model to keep a session fixed. Log in to each provider on that machine;
 credentials and routing history are not synced.
 
 The pool lives in `pi/auto-model.json`. Your prompts go to Opus 5.5 first, and
-Luna 5.6 and Sol 6.1 take over when it fails. `/auto-model pool gpt-sol` keeps a
+Luna 5.6 and Sol 6.1 take over when it fails. The free Big Pickle
+(`opencode-cli/opencode/big-pickle`, through the `opencode-pi` bridge) shares
+the Opus preference with weight 1, so it answers some prompts: about one in six
+in an offline simulation. When OpenCode's free limit is used up, its turn fails
+in about six seconds and the next model answers. `/auto-model pool gpt-sol` keeps a
 session on Sol, `/auto-model pool claude` on Opus, and `/auto-model pool general`
 restores the mix. The Claude subscription is still picked with `/conta trabalho`
 or `/conta pessoal`. The local Devstral never answers your prompts; on the Mac it

@@ -8,7 +8,8 @@
       "targets": [
         { "id": "claude-bridge/claude-opus-5-5", "weight": 5 },
         { "id": "openai-codex/gpt-6.1-sol", "weight": 4 },
-        { "id": "openai-codex/gpt-5.6-luna", "weight": 4 }
+        { "id": "openai-codex/gpt-5.6-luna", "weight": 4 },
+        { "id": "opencode-cli/opencode/big-pickle", "weight": 1 }
       ]
     },
     "gpt-sol": {
@@ -33,7 +34,7 @@
       "name": "opus-default",
       "when": { "trigger": "user" },
       "then": {
-        "prefer": ["claude-bridge/claude-opus-5-5"],
+        "prefer": ["claude-bridge/claude-opus-5-5", "opencode-cli/opencode/big-pickle"],
         "exclude": ["ollama-local/*"],
         "thinking": "xhigh"
       }
