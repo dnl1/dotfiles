@@ -40,7 +40,7 @@ concrete model to keep a session fixed. Log in to each provider on that machine;
 credentials and routing history are not synced.
 
 The pool lives in `pi/auto-model.json`. Your prompts go to Opus 5.5 first, and
-Luna 5.6 and Sol 6.1 take over when it fails. The free Big Pickle
+Luna 6 and Sol 6.1 take over when it fails. The free Big Pickle
 (`opencode-cli/opencode/big-pickle`, through the `opencode-pi` bridge) shares
 the Opus preference with weight 1, so it answers some prompts: about one in six
 in an offline simulation. When OpenCode's free limit is used up, its turn fails
