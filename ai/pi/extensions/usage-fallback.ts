@@ -76,10 +76,8 @@ export default function (pi: ExtensionAPI) {
   let generation = 0;
   let closed = false;
   let disabled = false;
-  // Auto routing: the account switch a Claude stream error started, and whether one
-  // succeeded during the current run (the run repeats once on the new subscription).
+  // Auto waits for this switch inside the provider call, before its failover circuit opens.
   let pendingSwitch: Promise<boolean> | undefined;
-  let switchedThisRun = false;
 
   pi.registerFlag("usage-fallback", { type: "string", default: FALLBACK, description: "Fallback model when Claude reaches its quota (provider/model)." });
   pi.registerFlag("wait-claude", { type: "boolean", default: false, description: "Start on the selected model and return to Claude while the session is idle." });
@@ -173,15 +171,15 @@ export default function (pi: ExtensionAPI) {
     return false;
   }
 
-  // Auto routing: a Claude stream hit its quota. Later Claude routes use the next verified
-  // subscription; the model stays auto, and Sol remains the router's choice when none is left.
+  // Retry the same Claude request on the next verified subscription. Auto remains selected.
   async function switchAccount(ctx: ExtensionContext, report: ClaudeStreamError): Promise<boolean> {
     if (ctx.mode !== "tui") return false;
     const { rotation: candidates, reserve } = accounts();
     if (candidates.length + reserve.length < 2) return false;
     const current = activeProfile();
-    // A report from a subscription that is no longer active was already handled.
-    if (current.name !== report.profile || ![...candidates, ...reserve].some((profile) => profile.name === current.name)) return false;
+    if (![...candidates, ...reserve].some((profile) => profile.name === current.name)) return false;
+    // A concurrent request can finish failing after the verified switch completed.
+    if (current.name !== report.profile) return rotation?.active === current.name && !blocked(current.name as ProfileName);
     const epoch = generation;
     const target = { provider: "claude-bridge", id: report.model };
     // Quota is per subscription, so keep the blocks whichever Claude model the router picked.
@@ -194,7 +192,7 @@ export default function (pi: ExtensionAPI) {
     for (const profile of blocked(FALLBACK_LINK) ? [...candidates, ...reserve] : candidates) {
       if (profile.name === current.name || blocked(profile.name as ProfileName)) continue;
       const account = await identify(pi, profile);
-      if (closed || epoch !== generation || activeProfile().name !== current.name) return false;
+      if (closed || ctx.signal?.aborted || epoch !== generation || ctx.model?.provider !== AUTO_PROVIDER || activeProfile().name !== current.name) return false;
       if (!account.authenticated) {
         if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} excluded from rotation: ${account.error ?? "not logged in"}. Use /contas to check.`, "warning");
         continue;
@@ -203,7 +201,6 @@ export default function (pi: ExtensionAPI) {
       rotation.active = profile.name as ProfileName;
       windows = {};
       saveRotation();
-      switchedThisRun = true;
       pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
       if (ctx.hasUI) ctx.ui.notify(`Claude ${current.name} reached its limit. Claude requests continue on subscription ${profile.name}.`, "warning");
       return true;
@@ -308,7 +305,7 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) return;
     const minutes = (time: number) => Math.max(0, Math.ceil((time - Date.now()) / 60_000));
     if (!watch && reserveActive(ctx)) {
-      const above = [...rotationProfiles().map((profile) => profile.name as Link), FALLBACK_LINK];
+      const above: Link[] = [...rotationProfiles().map((profile) => profile.name as Link), FALLBACK_LINK];
       const wait = minutes(Math.min(...above.map((link) => rotation!.blocked[link]?.nextAt ?? 0)));
       return ctx.ui.setStatus(ENTRY, `Claude ${rotation!.active} (reserve): leave ${wait ? `in ${wait} min` : "when idle"}`);
     }
@@ -471,13 +468,24 @@ export default function (pi: ExtensionAPI) {
     timer.unref?.();
     await idle(ctx);
   });
-  const unsubscribeStream = pi.events?.on(CLAUDE_STREAM_ERROR, (report: ClaudeStreamError) => {
+  const unsubscribeStream = pi.events?.on(CLAUDE_STREAM_ERROR, (value) => {
+    if (!value || typeof value !== "object" ||
+      !("profile" in value) || typeof value.profile !== "string" ||
+      !("model" in value) || typeof value.model !== "string" ||
+      !("error" in value) || typeof value.error !== "string") return;
+    const retry = "retry" in value ? value.retry : undefined;
+    const report: ClaudeStreamError = {
+      profile: value.profile, model: value.model, error: value.error,
+      retry: typeof retry === "function" ? (pending) => retry(pending) : undefined,
+    };
     const ctx = currentContext;
     // Direct Claude sessions rotate at settle, where every quota error arrives.
-    if (!ctx || closed || pendingSwitch || ctx.model?.provider !== AUTO_PROVIDER ||
-      !USAGE_LIMIT_PATTERNS.some((pattern) => pattern.test(report?.error ?? ""))) return;
+    if (!ctx || closed || ctx.model?.provider !== AUTO_PROVIDER ||
+      !USAGE_LIMIT_PATTERNS.some((pattern) => pattern.test(report.error))) return;
+    if (pendingSwitch) { report.retry?.(pendingSwitch); return; }
     const switching = switchAccount(ctx, report).catch(() => false);
     pendingSwitch = switching;
+    report.retry?.(switching);
     void switching.finally(() => { if (pendingSwitch === switching) pendingSwitch = undefined; });
   });
   const unsubscribe = pi.events?.on(ACCOUNT_CHANGED, (event: any) => {
@@ -526,8 +534,6 @@ export default function (pi: ExtensionAPI) {
   // response is omitted; completed tools and raw transcript entries stay intact.
   pi.on("agent_before_settle", async (event, ctx) => {
     if (pendingSwitch) await pendingSwitch;
-    const switched = switchedThisRun;
-    switchedThisRun = false;
     if (event.outcome === "completed" && rotation && key(ctx.model) === key(rotation.model)) {
       delete rotation.blocked[rotation.active];
       saveRotation();
@@ -545,8 +551,8 @@ export default function (pi: ExtensionAPI) {
     const omitFailure = () => ({
       entries: [{ type: "context_edit" as const, targetId: entry.sourceEntry.id, replacement: null }], continue: true,
     });
-    // Auto routing: Claude moved to another subscription during this run, so repeat it once.
-    if (message.provider === AUTO_PROVIDER) return switched ? omitFailure() : undefined;
+    // Auto retries subscriptions within its existing provider call, never via agent.continue().
+    if (message.provider === AUTO_PROVIDER) return;
     if (!CLAUDE_PROVIDERS.has(message.provider)) {
       if (key(ctx.model) !== key(fallbackModel()) || !FALLBACK_LIMIT_PATTERNS.some((pattern) => pattern.test(message.errorMessage ?? ""))) return;
       try {

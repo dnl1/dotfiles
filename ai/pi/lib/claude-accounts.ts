@@ -7,10 +7,12 @@ export const ACCOUNT_CHANGED = "claude-account-changed";
 // Asked on the shared event bus; claude-bridge-accounts answers. Pi scopes flags to the
 // extension that registered them, so no other extension can read its flag directly.
 export const ISOLATION_QUERY = "claude-account-isolation-query";
-// claude-bridge-accounts reports every Claude stream that ends in an error, with the
-// subscription that served it, so a quota hit is seen even when auto routing recovers.
+// Empty failed attempts ask rotation to finish before Auto sees the provider error.
 export const CLAUDE_STREAM_ERROR = "claude-stream-error";
-export type ClaudeStreamError = { profile: string; model: string; error: string };
+export type ClaudeStreamError = {
+  profile: string; model: string; error: string;
+  retry?: (pending: Promise<boolean>) => void;
+};
 export const ACCOUNT_NAMES = ["trabalho", "pessoal"] as const;
 // Marks the --usage-fallback model's position in the rotation. Accounts after it are reserves.
 export const FALLBACK_LINK = "fallback";

@@ -9,6 +9,19 @@ import usageFallback from "../ai/pi/extensions/usage-fallback.ts";
 import { answerIsolation, bridgeAPI, accountSessionId } from "../ai/pi/extensions/claude-bridge-accounts.ts";
 import { ACCOUNT_CHANGED, CLAUDE_STREAM_ERROR, OVERRIDES, accountConfig } from "../ai/pi/lib/claude-accounts.ts";
 
+const install = join(homedir(), ".pi/agent/install");
+const sdkDir = process.env.PI_SDK_DIR ?? join(install, "releases", readFileSync(join(install, "current-version"), "utf8").trim(), "node_modules/@earendil-works/pi-coding-agent");
+const { createAssistantMessageEventStream: createStream } = await import(pathToFileURL(resolve(sdkDir, "../pi-ai/dist/index.js")).href);
+function responseStream(message, events = []) {
+  const stream = createStream();
+  for (const event of events) stream.push(event);
+  stream.push(message.stopReason === "error"
+    ? { type: "error", reason: "error", error: message }
+    : { type: "done", reason: "stop", message });
+  stream.end();
+  return stream;
+}
+
 const claude = { provider: "claude-bridge", id: "claude-opus-5-5" };
 const sol = { provider: "openai-codex", id: "gpt-6.1-sol" };
 const quota = "Claude quota exceeded: You're out of extra usage";
@@ -404,11 +417,11 @@ test("auto: a Claude quota hit that routing recovers from moves later Claude req
   assert.ok(h.notifications.some((text) => /trabalho reached its limit.*pessoal/.test(text)));
 });
 
-test("auto: a quota failure that reaches the session repeats once on the new subscription", async (t) => {
+test("auto: a surfaced failure never continues with a discarded route plan", async (t) => {
   const h = harness(t, { model: auto });
   await h.start();
   streamError(h);
-  assert.deepEqual(await h.run(quota), omitted);
+  assert.equal(await h.run(quota), undefined);
   assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
   streamError(h, quota, "pessoal");
   assert.equal(await h.run(quota), undefined, "with both subscriptions exhausted the error stays");
@@ -444,43 +457,124 @@ test("auto: resuming the session restores the subscription it had switched to", 
   assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
 });
 
-test("the adapter reports a failed Claude stream with the subscription that served it", async (t) => {
+test("the adapter reports the serving subscription and preserves an unhandled error", async (t) => {
   const h = harness(t);
   const reports = [];
-  h.pi.events.on(CLAUDE_STREAM_ERROR, (report) => reports.push(report));
+  h.pi.events.on(CLAUDE_STREAM_ERROR, ({ profile, model, error }) => reports.push({ profile, model, error }));
   let provider;
-  const api = bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } });
-  const results = [{ stopReason: "error", errorMessage: quota }, { stopReason: "stop" }];
-  api.registerProvider("claude-bridge", { streamSimple: () => {
-    const result = results.shift();
-    return result ? { result: () => Promise.resolve(result) } : {};
-  } });
+  const api = bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream);
+  const message = { stopReason: "error", errorMessage: quota };
+  api.registerProvider("claude-bridge", { streamSimple: () => responseStream(message) });
   const first = provider.streamSimple(claude, {}, {});
   process.env.CLAUDE_CONFIG_DIR = h.personal;
-  provider.streamSimple(claude, {}, {});
-  assert.deepEqual(provider.streamSimple(claude, {}, {}), {}, "a stream without result() passes through");
-  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(await first.result(), message);
   assert.deepEqual(reports, [{ profile: "trabalho", model: claude.id, error: quota }]);
-  assert.equal(typeof first.result, "function", "the stream itself is returned untouched");
 });
 
 test("the adapter namespaces only bridge calls and fans rewrites out to both accounts", async (t) => {
   const h = harness(t);
   const captured = [], handlers = new Map();
   let provider;
-  const api = bridgeAPI({ ...h.pi, on: (name, fn) => handlers.set(name, fn), registerProvider: (_name, config) => { provider = config; } });
-  api.registerProvider("claude-bridge", { streamSimple: (_model, _context, options) => captured.push(options.sessionId) });
+  const api = bridgeAPI({ ...h.pi, on: (name, fn) => handlers.set(name, fn), registerProvider: (_name, config) => { provider = config; } }, createStream);
+  api.registerProvider("claude-bridge", { streamSimple: (_model, _context, options) => {
+    captured.push(options.sessionId);
+    return responseStream({ stopReason: "stop" });
+  } });
   const rewritten = [];
   api.on("session_compact", (_event, ctx) => rewritten.push(ctx.sessionManager.getSessionId()));
-  provider.streamSimple(claude, {}, { sessionId: "original-session" });
+  await provider.streamSimple(claude, {}, { sessionId: "original-session" }).result();
   process.env.CLAUDE_CONFIG_DIR = h.personal;
-  provider.streamSimple(claude, {}, { sessionId: "original-session" });
+  await provider.streamSimple(claude, {}, { sessionId: "original-session" }).result();
   await handlers.get("session_compact")({}, h.ctx);
   assert.notEqual(captured[0], captured[1]);
   assert.deepEqual(rewritten, captured);
   assert.equal(h.ctx.sessionManager.getSessionId(), "original-session");
   assert.equal(captured.some((id) => id.includes(h.personal) || id.includes("example.test")), false);
   assert.equal(captured[1], accountSessionId("original-session", { name: "pessoal", directory: h.personal }));
+});
+
+for (const event of [
+  { type: "text_delta", delta: "partial response" },
+  { type: "toolcall_end", toolCall: { id: "tool-1", name: "bash", arguments: { command: "write once" } } },
+]) test(`auto never replays quota errors after ${event.type}`, async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  let provider, attempts = 0;
+  bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream)
+    .registerProvider("claude-bridge", { streamSimple: () => {
+      attempts++;
+      return responseStream({ stopReason: "error", errorMessage: quota }, [event]);
+    } });
+  const events = [];
+  for await (const output of provider.streamSimple(claude, {}, {})) events.push(output);
+  assert.equal(attempts, 1);
+  assert.deepEqual(events.map((output) => output.type), [event.type, "error"]);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
+  assert.equal(h.executions.length, 0);
+});
+
+test("an empty failed attempt's start never escapes before the successful subscription", async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  let provider, attempts = 0;
+  const success = { stopReason: "stop" };
+  bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream)
+    .registerProvider("claude-bridge", { streamSimple: () => {
+      const message = ++attempts === 1 ? { stopReason: "error", errorMessage: quota } : success;
+      return responseStream(message, [{ type: "start", partial: message }]);
+    } });
+  const output = provider.streamSimple(claude, {}, {});
+  const events = [];
+  for await (const event of output) events.push(event);
+  assert.deepEqual(events, [{ type: "start", partial: success }, { type: "done", reason: "stop", message: success }]);
+  assert.equal(await output.result(), success);
+});
+
+for (const late of [false, true]) test(`overlapping Auto quota reports share the verified account switch (late=${late})`, async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  let provider, attempts = 0;
+  const second = createStream();
+  const failure = { stopReason: "error", errorMessage: quota };
+  bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream)
+    .registerProvider("claude-bridge", { streamSimple: () => {
+      attempts++;
+      return attempts === 2 ? second : responseStream(attempts > 2 ? { stopReason: "stop" } : failure);
+    } });
+  const one = provider.streamSimple(claude, {}, {});
+  const two = provider.streamSimple(claude, {}, {});
+  const finishSecond = () => { second.push({ type: "error", reason: "error", error: failure }); second.end(); };
+  if (!late) finishSecond();
+  assert.equal((await one.result()).stopReason, "stop");
+  if (late) finishSecond();
+  assert.equal((await two.result()).stopReason, "stop");
+  assert.equal(h.executions.length, 1, "both requests use the same verified switch");
+  assert.equal(attempts, 4);
+});
+
+test("auto abort while verifying the next subscription never retries or changes the login", async (t) => {
+  const controller = new AbortController();
+  const h = harness(t, { model: auto, signal: controller.signal, onIdentify: () => controller.abort() });
+  await h.start();
+  let provider, attempts = 0;
+  bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream)
+    .registerProvider("claude-bridge", { streamSimple: () => {
+      attempts++;
+      return responseStream({ stopReason: "error", errorMessage: quota });
+    } });
+  assert.equal((await provider.streamSimple(claude, {}, { signal: controller.signal }).result()).stopReason, "error");
+  assert.equal(attempts, 1);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
+});
+
+test("a synchronous bridge failure terminates the wrapped stream", async (t) => {
+  const h = harness(t);
+  let provider;
+  bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } }, createStream)
+    .registerProvider("claude-bridge", { streamSimple: () => { throw new Error("offline bridge failed"); } });
+  const result = await provider.streamSimple(claude, {}, {}).result();
+  assert.equal(result.stopReason, "error");
+  assert.equal(result.errorMessage, "Error: offline bridge failed");
 });
 
 test("the real Pi loader loads the pinned bridge once through the adapter, offline", async (t) => {

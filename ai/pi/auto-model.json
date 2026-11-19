@@ -34,7 +34,8 @@
       "name": "opus-default",
       "when": { "trigger": "user" },
       "then": {
-        "prefer": ["claude-bridge/claude-opus-5-5", "opencode-cli/opencode/big-pickle"],
+        "only": ["claude-bridge/claude-opus-5-5", "openai-codex/gpt-6.1-sol"],
+        "prefer": ["claude-bridge/claude-opus-5-5"],
         "exclude": ["ollama-local/*"],
         "thinking": "xhigh"
       }
