@@ -6,8 +6,8 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import usageFallback from "../ai/pi/extensions/usage-fallback.ts";
-import { bridgeAPI, accountSessionId } from "../ai/pi/extensions/claude-bridge-accounts.ts";
-import { ACCOUNT_CHANGED, OVERRIDES, accountConfig } from "../ai/pi/lib/claude-accounts.ts";
+import { answerIsolation, bridgeAPI, accountSessionId } from "../ai/pi/extensions/claude-bridge-accounts.ts";
+import { ACCOUNT_CHANGED, CLAUDE_STREAM_ERROR, OVERRIDES, accountConfig } from "../ai/pi/lib/claude-accounts.ts";
 
 const claude = { provider: "claude-bridge", id: "claude-opus-5-5" };
 const sol = { provider: "openai-codex", id: "gpt-6.1-sol" };
@@ -51,8 +51,9 @@ function harness(t, options = {}) {
   };
   const pi = {
     on: (name, fn) => handlers.set(name, fn), events,
+    // As in Pi, an extension reads only the flags it registered.
     registerFlag: (name, config) => flags.set(name, config.default),
-    getFlag: (name) => name === "claude-account-isolation" ? options.isolation !== false : flags.get(name),
+    getFlag: (name) => flags.get(name),
     registerCommand: (name, command) => commands.set(name, command),
     getSettings: () => ({ defaultProvider: claude.provider, defaultModel: claude.id, defaultThinkingLevel: "xhigh" }),
     getThinkingLevel: () => level, setThinkingLevel: (value) => { level = value; },
@@ -79,6 +80,11 @@ function harness(t, options = {}) {
       return true;
     },
   };
+  // claude-bridge-accounts is a separate extension: its own flags, the shared event bus.
+  if (options.adapter !== false) {
+    const adapterFlags = new Map([["claude-account-isolation", options.isolation !== false]]);
+    answerIsolation({ events, getFlag: (name) => adapterFlags.get(name), on: () => {} });
+  }
   usageFallback(pi);
   t.after(async () => {
     await handlers.get("session_shutdown")?.({}, ctx);
@@ -144,7 +150,7 @@ for (const name of OVERRIDES) {
   });
 }
 
-for (const options of [{ isolation: false }, { optIn: false }]) {
+for (const options of [{ isolation: false }, { adapter: false }, { optIn: false }]) {
   test(`requires explicit opt-in and an account-aware bridge: ${JSON.stringify(options)}`, async (t) => {
     const h = harness(t, options);
     if (options.optIn === false) { delete h.config.rotation; h.writeConfig(); }
@@ -380,6 +386,82 @@ test("/claude-return off keeps the session on the personal reserve", async (t) =
   await h.tick();
   assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
   assert.equal(h.ctx.model, claude);
+});
+
+const auto = { provider: "pi-auto-model", id: "auto" };
+const streamError = (h, error = quota, profile = "trabalho") =>
+  h.pi.events.emit(CLAUDE_STREAM_ERROR, { profile, model: claude.id, error });
+
+test("auto: a Claude quota hit that routing recovers from moves later Claude requests to personal", async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  streamError(h);
+  assert.equal(await h.run(quota, "completed"), undefined);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
+  assert.equal(h.ctx.model, auto);
+  assert.equal(h.switches.length, 0, "auto routing keeps its model");
+  assert.equal(last(h, "claude-account-rotation").active, "pessoal");
+  assert.ok(h.notifications.some((text) => /trabalho reached its limit.*pessoal/.test(text)));
+});
+
+test("auto: a quota failure that reaches the session repeats once on the new subscription", async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  streamError(h);
+  assert.deepEqual(await h.run(quota), omitted);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
+  streamError(h, quota, "pessoal");
+  assert.equal(await h.run(quota), undefined, "with both subscriptions exhausted the error stays");
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
+  assert.equal(h.ctx.model, auto);
+  assert.equal(h.switches.length, 0);
+});
+
+test("auto: ignores other errors and hits from a subscription that is no longer active", async (t) => {
+  const h = harness(t, { model: auto });
+  await h.start();
+  streamError(h, "503 overloaded");
+  streamError(h, quota, "pessoal");
+  assert.equal(await h.run("503 overloaded"), undefined);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, undefined);
+  assert.equal(h.executions.length, 0);
+});
+
+test("direct sessions rotate once, at settle, not on the stream report", async (t) => {
+  const h = harness(t);
+  await h.start();
+  streamError(h);
+  assert.deepEqual(await h.run(), omitted);
+  assert.equal(h.ctx.model, claude);
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
+  assert.deepEqual(Object.keys(last(h, "claude-account-rotation").blocked), ["trabalho"]);
+});
+
+test("auto: resuming the session restores the subscription it had switched to", async (t) => {
+  const journal = [{ type: "custom", customType: "claude-account-rotation", data: { model: claude, active: "pessoal", blocked: {} } }];
+  const h = harness(t, { model: auto, journal });
+  await h.start();
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, h.personal);
+});
+
+test("the adapter reports a failed Claude stream with the subscription that served it", async (t) => {
+  const h = harness(t);
+  const reports = [];
+  h.pi.events.on(CLAUDE_STREAM_ERROR, (report) => reports.push(report));
+  let provider;
+  const api = bridgeAPI({ ...h.pi, registerProvider: (_name, config) => { provider = config; } });
+  const results = [{ stopReason: "error", errorMessage: quota }, { stopReason: "stop" }];
+  api.registerProvider("claude-bridge", { streamSimple: () => {
+    const result = results.shift();
+    return result ? { result: () => Promise.resolve(result) } : {};
+  } });
+  const first = provider.streamSimple(claude, {}, {});
+  process.env.CLAUDE_CONFIG_DIR = h.personal;
+  provider.streamSimple(claude, {}, {});
+  assert.deepEqual(provider.streamSimple(claude, {}, {}), {}, "a stream without result() passes through");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(reports, [{ profile: "trabalho", model: claude.id, error: quota }]);
+  assert.equal(typeof first.result, "function", "the stream itself is returned untouched");
 });
 
 test("the adapter namespaces only bridge calls and fans rewrites out to both accounts", async (t) => {

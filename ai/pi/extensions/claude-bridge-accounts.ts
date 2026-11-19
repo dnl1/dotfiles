@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ExtensionAPI, ExtensionContext, ProviderConfig } from "@earendil-works/pi-coding-agent";
-import { activeProfile, directoryKey, profiles, type Profile } from "../lib/claude-accounts.ts";
+import { CLAUDE_STREAM_ERROR, ISOLATION_QUERY, activeProfile, clean, directoryKey, profiles, type ClaudeStreamError, type Profile } from "../lib/claude-accounts.ts";
 
 export function accountSessionId(id: string, profile: Profile): string {
   const account = createHash("sha256").update(directoryKey(profile)).digest("hex").slice(0, 16);
@@ -24,6 +24,20 @@ function accountContext(ctx: ExtensionContext, profile: Profile): ExtensionConte
   });
 }
 
+// Reports a stream that ends in an error, with the subscription that served it. Reading
+// result() does not consume the events, so Pi and auto routing see the stream unchanged.
+function reportFailure(pi: ExtensionAPI, stream: unknown, model: string): void {
+  const result = (stream as { result?: () => Promise<any> } | undefined)?.result;
+  if (typeof result !== "function") return;
+  let profile: string;
+  try { profile = activeProfile().name; } catch { return; }
+  result.call(stream).then((message) => {
+    if (message?.stopReason !== "error") return;
+    const report: ClaudeStreamError = { profile, model, error: clean(message.errorMessage) };
+    pi.events?.emit(CLAUDE_STREAM_ERROR, report);
+  }, () => {});
+}
+
 // Only the bridge receives per-account IDs. Pi history, tools, and hooks keep the original ID.
 export function bridgeAPI(pi: ExtensionAPI): ExtensionAPI {
   return new Proxy(pi, {
@@ -41,16 +55,28 @@ export function bridgeAPI(pi: ExtensionAPI): ExtensionAPI {
         const stream = config.streamSimple;
         target.registerProvider(name, {
           ...config,
-          streamSimple: (model, context, options) => stream(model, context, {
-            ...options,
-            sessionId: options?.sessionId ? accountSessionId(options.sessionId, activeProfile()) : undefined,
-          }),
+          streamSimple: (model, context, options) => {
+            const result = stream(model, context, {
+              ...options,
+              sessionId: options?.sessionId ? accountSessionId(options.sessionId, activeProfile()) : undefined,
+            });
+            reportFailure(target, result, model.id);
+            return result;
+          },
         });
       };
       const value = Reflect.get(target, property, target);
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
+}
+
+// Answers usage-fallback's isolation query with this extension's own flag.
+export function answerIsolation(pi: ExtensionAPI): void {
+  const unsubscribe = pi.events?.on(ISOLATION_QUERY, (query: any) => {
+    query?.answer?.(pi.getFlag("claude-account-isolation") === true);
+  });
+  pi.on("session_shutdown", () => unsubscribe?.());
 }
 
 export default async function (pi: ExtensionAPI) {
@@ -62,4 +88,5 @@ export default async function (pi: ExtensionAPI) {
   pi.registerFlag("claude-account-isolation", {
     type: "boolean", default: true, description: "Isolates bridge sessions by Claude subscription.",
   });
+  answerIsolation(pi);
 }

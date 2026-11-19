@@ -131,6 +131,11 @@ subscription emails. Missing logins, wrong emails and API authentication are
 skipped. Exported Anthropic credentials or gateway variables disable account
 rotation. Tokens are neither copied nor committed. A quota failure continues
 the same request on the next available account; unrelated errors do not rotate.
+With automatic routing, the adapter reports every Claude stream that fails. A
+quota hit moves later Claude routes to the next account, even when another model
+finishes that request, and a failure that reaches the session repeats once on
+the new account. The session stays on automatic routing; with every account
+exhausted, the router keeps choosing among the other models.
 An account keeps serving requests until it reaches its own limit. Each account
 has its own reset time. When both are exhausted, Sol serves the session until
 a Claude account becomes available. Remove `rotation` to keep single-account

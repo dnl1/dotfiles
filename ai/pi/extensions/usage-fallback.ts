@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { ACCOUNT_CHANGED, ACCOUNT_NAMES, FALLBACK_LINK, OVERRIDES, accountConfig, activeProfile, identify, restoreDirectory, type Profile, type ProfileName } from "../lib/claude-accounts.ts";
+import { ACCOUNT_CHANGED, ACCOUNT_NAMES, CLAUDE_STREAM_ERROR, FALLBACK_LINK, OVERRIDES, accountConfig, accountIsolation, activeProfile, identify, restoreDirectory, type ClaudeStreamError, type Profile, type ProfileName } from "../lib/claude-accounts.ts";
+import { AUTO_PROVIDER } from "../lib/model-status.ts";
 
 const FALLBACK = "openai-codex/gpt-6.1-sol";
 const CLAUDE_PROVIDERS = new Set(["claude-bridge", "anthropic"]);
@@ -75,6 +76,10 @@ export default function (pi: ExtensionAPI) {
   let generation = 0;
   let closed = false;
   let disabled = false;
+  // Auto routing: the account switch a Claude stream error started, and whether one
+  // succeeded during the current run (the run repeats once on the new subscription).
+  let pendingSwitch: Promise<boolean> | undefined;
+  let switchedThisRun = false;
 
   pi.registerFlag("usage-fallback", { type: "string", default: FALLBACK, description: "Fallback model when Claude reaches its quota (provider/model)." });
   pi.registerFlag("wait-claude", { type: "boolean", default: false, description: "Start on the selected model and return to Claude while the session is idle." });
@@ -86,7 +91,7 @@ export default function (pi: ExtensionAPI) {
   function saveRotation() { pi.appendEntry(ROTATION_ENTRY, rotation ?? null); }
 
   function accounts(): { rotation: Profile[]; reserve: Profile[] } {
-    if (pi.getFlag("claude-account-isolation") !== true || OVERRIDES.some((name) => process.env[name])) return { rotation: [], reserve: [] };
+    if (!accountIsolation(pi) || OVERRIDES.some((name) => process.env[name])) return { rotation: [], reserve: [] };
     return accountConfig();
   }
 
@@ -163,6 +168,44 @@ export default function (pi: ExtensionAPI) {
       render(ctx);
       pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
       if (ctx.hasUI) ctx.ui.notify(`Claude ${current.name} reached its limit. Continuing with subscription ${profile.name} in the same conversation.`, "warning");
+      return true;
+    }
+    return false;
+  }
+
+  // Auto routing: a Claude stream hit its quota. Later Claude routes use the next verified
+  // subscription; the model stays auto, and Sol remains the router's choice when none is left.
+  async function switchAccount(ctx: ExtensionContext, report: ClaudeStreamError): Promise<boolean> {
+    if (ctx.mode !== "tui") return false;
+    const { rotation: candidates, reserve } = accounts();
+    if (candidates.length + reserve.length < 2) return false;
+    const current = activeProfile();
+    // A report from a subscription that is no longer active was already handled.
+    if (current.name !== report.profile || ![...candidates, ...reserve].some((profile) => profile.name === current.name)) return false;
+    const epoch = generation;
+    const target = { provider: "claude-bridge", id: report.model };
+    // Quota is per subscription, so keep the blocks whichever Claude model the router picked.
+    rotation ??= { model: target, active: current.name as ProfileName, blocked: {} };
+    rotation.model = target;
+    const previousBlock = rotation.blocked[current.name as ProfileName];
+    const attempts = previousBlock ? Math.min(100, previousBlock.attempts + 1) : 0;
+    rotation.blocked[current.name as ProfileName] = { nextAt: retryAt(report.error, attempts), attempts };
+    saveRotation();
+    for (const profile of blocked(FALLBACK_LINK) ? [...candidates, ...reserve] : candidates) {
+      if (profile.name === current.name || blocked(profile.name as ProfileName)) continue;
+      const account = await identify(pi, profile);
+      if (closed || epoch !== generation || activeProfile().name !== current.name) return false;
+      if (!account.authenticated) {
+        if (ctx.hasUI) ctx.ui.notify(`Claude ${profile.name} excluded from rotation: ${account.error ?? "not logged in"}. Use /contas to check.`, "warning");
+        continue;
+      }
+      restoreDirectory(profile.directory);
+      rotation.active = profile.name as ProfileName;
+      windows = {};
+      saveRotation();
+      switchedThisRun = true;
+      pi.events?.emit(ACCOUNT_CHANGED, { source: "rotation" });
+      if (ctx.hasUI) ctx.ui.notify(`Claude ${current.name} reached its limit. Claude requests continue on subscription ${profile.name}.`, "warning");
       return true;
     }
     return false;
@@ -393,7 +436,7 @@ export default function (pi: ExtensionAPI) {
         const profile = [...candidates, ...reserve].find((candidate) => candidate.name === (saved.data as Rotation).active);
         if (profile) {
           rotation = structuredClone(saved.data);
-          if (key(ctx.model) === key(rotation!.model)) {
+          if (key(ctx.model) === key(rotation!.model) || ctx.model?.provider === AUTO_PROVIDER) {
             restoreDirectory(profile.directory);
             if (!(await identify(pi, profile)).authenticated && ctx.hasUI) ctx.ui.notify(`Subscription ${profile.name} for this session is not logged in. Use /contas.`, "warning");
             pi.events?.emit(ACCOUNT_CHANGED, { source: "restore" });
@@ -428,6 +471,15 @@ export default function (pi: ExtensionAPI) {
     timer.unref?.();
     await idle(ctx);
   });
+  const unsubscribeStream = pi.events?.on(CLAUDE_STREAM_ERROR, (report: ClaudeStreamError) => {
+    const ctx = currentContext;
+    // Direct Claude sessions rotate at settle, where every quota error arrives.
+    if (!ctx || closed || pendingSwitch || ctx.model?.provider !== AUTO_PROVIDER ||
+      !USAGE_LIMIT_PATTERNS.some((pattern) => pattern.test(report?.error ?? ""))) return;
+    const switching = switchAccount(ctx, report).catch(() => false);
+    pendingSwitch = switching;
+    void switching.finally(() => { if (pendingSwitch === switching) pendingSwitch = undefined; });
+  });
   const unsubscribe = pi.events?.on(ACCOUNT_CHANGED, (event: any) => {
     if (event?.source !== "manual") return;
     rotation = undefined;
@@ -438,6 +490,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", (_event, ctx) => { currentContext = ctx; });
   pi.on("session_shutdown", () => {
     unsubscribe?.();
+    unsubscribeStream?.();
     closed = true;
     generation++;
     if (timer) clearInterval(timer);
@@ -472,6 +525,9 @@ export default function (pi: ExtensionAPI) {
   // Quota failures settle after Pi's ordinary retries. Only this unfinished
   // response is omitted; completed tools and raw transcript entries stay intact.
   pi.on("agent_before_settle", async (event, ctx) => {
+    if (pendingSwitch) await pendingSwitch;
+    const switched = switchedThisRun;
+    switchedThisRun = false;
     if (event.outcome === "completed" && rotation && key(ctx.model) === key(rotation.model)) {
       delete rotation.blocked[rotation.active];
       saveRotation();
@@ -489,6 +545,8 @@ export default function (pi: ExtensionAPI) {
     const omitFailure = () => ({
       entries: [{ type: "context_edit" as const, targetId: entry.sourceEntry.id, replacement: null }], continue: true,
     });
+    // Auto routing: Claude moved to another subscription during this run, so repeat it once.
+    if (message.provider === AUTO_PROVIDER) return switched ? omitFailure() : undefined;
     if (!CLAUDE_PROVIDERS.has(message.provider)) {
       if (key(ctx.model) !== key(fallbackModel()) || !FALLBACK_LIMIT_PATTERNS.some((pattern) => pattern.test(message.errorMessage ?? ""))) return;
       try {

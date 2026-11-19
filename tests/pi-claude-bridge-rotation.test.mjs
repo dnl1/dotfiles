@@ -28,10 +28,25 @@ async function realSession({ rotation, solFails }, run) {
   const key = `pi-rotation-test-${Date.now()}`;
   const calls = [];
   globalThis[key] = calls;
-  const fixture = join(dir, "fixture.ts");
+  // Two extensions, as Pi loads them from ~/.pi/agent/extensions: each sees only
+  // the flags it registered, so the fallback cannot read the adapter's flag.
+  const fixture = join(dir, "fixture-adapter.ts");
+  const fallbackFixture = join(dir, "fixture-fallback.ts");
+  writeFileSync(fallbackFixture, `
+import fallback from ${JSON.stringify(resolve("ai/pi/extensions/usage-fallback.ts"))};
+const personal = ${JSON.stringify(personal)};
+export default function(pi) {
+  fallback(new Proxy(pi, { get(target, property) {
+    if (property === "exec") return async (_command, args) => ({ code: 0, stdout: JSON.stringify({
+      loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", subscriptionType: "pro",
+      email: args[0] === "CLAUDE_CONFIG_DIR=" + personal ? "personal@example.test" : "work@example.test",
+    }) });
+    return target[property];
+  } }));
+}
+`);
   writeFileSync(fixture, `
 import adapter from ${JSON.stringify(resolve("ai/pi/extensions/claude-bridge-accounts.ts"))};
-import fallback from ${JSON.stringify(resolve("ai/pi/extensions/usage-fallback.ts"))};
 import { __test } from ${JSON.stringify(join(bridgeRoot, "src/index.ts"))};
 const calls = globalThis[${JSON.stringify(key)}];
 const work = ${JSON.stringify(work)};
@@ -61,13 +76,6 @@ export default async function(pi) {
     return iterator;
   });
   await adapter(pi);
-  fallback(new Proxy(pi, { get(target, property) {
-    if (property === "exec") return async (_command, args) => ({ code: 0, stdout: JSON.stringify({
-      loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", subscriptionType: "pro",
-      email: args[0] === "CLAUDE_CONFIG_DIR=" + personal ? "personal@example.test" : "work@example.test",
-    }) });
-    return target[property];
-  } }));
   pi.on("session_shutdown", () => __test.setQuery(null));
 }
 `);
@@ -93,7 +101,7 @@ export default async function(pi) {
       },
     });
     const settings = SettingsManager.inMemory({ defaultProvider: "claude-bridge", defaultModel: "claude-opus-5-5", retry: { enabled: false }, compaction: { enabled: false } });
-    const resources = new DefaultResourceLoader({ cwd: dir, agentDir: dir, settingsManager: settings, noSkills: true, noThemes: true, noPromptTemplates: true, noContextFiles: true, additionalExtensionPaths: [fixture] });
+    const resources = new DefaultResourceLoader({ cwd: dir, agentDir: dir, settingsManager: settings, noSkills: true, noThemes: true, noPromptTemplates: true, noContextFiles: true, additionalExtensionPaths: [fixture, fallbackFixture] });
     await resources.reload();
     assert.deepEqual(resources.getExtensions().errors, []);
     for (const registration of resources.getExtensions().runtime.pendingProviderRegistrations) runtime.registerProvider(registration.name, registration.config);

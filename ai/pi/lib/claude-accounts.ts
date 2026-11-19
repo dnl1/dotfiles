@@ -4,6 +4,13 @@ import { join, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const ACCOUNT_CHANGED = "claude-account-changed";
+// Asked on the shared event bus; claude-bridge-accounts answers. Pi scopes flags to the
+// extension that registered them, so no other extension can read its flag directly.
+export const ISOLATION_QUERY = "claude-account-isolation-query";
+// claude-bridge-accounts reports every Claude stream that ends in an error, with the
+// subscription that served it, so a quota hit is seen even when auto routing recovers.
+export const CLAUDE_STREAM_ERROR = "claude-stream-error";
+export type ClaudeStreamError = { profile: string; model: string; error: string };
 export const ACCOUNT_NAMES = ["trabalho", "pessoal"] as const;
 // Marks the --usage-fallback model's position in the rotation. Accounts after it are reserves.
 export const FALLBACK_LINK = "fallback";
@@ -54,6 +61,18 @@ export function accountConfig(): { profiles: Profile[]; rotation: Profile[]; res
 }
 
 export function profiles(): Profile[] { return accountConfig().profiles; }
+
+/**
+ * Whether bridge sessions are isolated per subscription, as claude-bridge-accounts reports
+ * it. False when that extension is not loaded or its flag is off: switching the login without
+ * isolation would resume one account's Claude Code session under the other.
+ */
+export function accountIsolation(pi: Pick<ExtensionAPI, "events">): boolean {
+  let isolated = false;
+  // The event bus calls handlers synchronously, so the answer is in before emit returns.
+  pi.events?.emit(ISOLATION_QUERY, { answer: (value: unknown) => { isolated = value === true; } });
+  return isolated;
+}
 
 export function directoryKey(profile: Pick<Profile, "directory">): string {
   return profile.directory ?? join(homedir(), ".claude");
