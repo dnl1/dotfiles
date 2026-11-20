@@ -4,11 +4,13 @@ The dotfiles bootstrap builds `~/.pi/agent/packages/pi-routing-compat` from the 
 
 ## Runtime
 
-Pi 1.4.0 or later is required. The bootstrap updates older Pi installs before preparing the package. It installs the pinned npm packages, verifies the eight upstream file hashes, applies `compat.patch`, verifies the patched hashes, then activates the settings layer. A failed build leaves the previous compatibility package in place. A changed build backs it up under `~/.pi/agent/backups/`.
+Pi 1.4.0 or later is required. The bootstrap updates older Pi installs before preparing the package. It installs the pinned npm packages, verifies the ten upstream file hashes, applies `compat.patch`, verifies the patched hashes, then activates the settings layer. A failed build leaves the previous compatibility package in place. A changed build backs it up under `~/.pi/agent/backups/`.
 
 Only the compatibility package registers Codex and automatic routing. The npm originals stay installed with `extensions: []`. Runtime dependencies and Pi peers use relative links created on each machine; no Mac paths are copied to WSL. The upstream licenses remain in the generated package.
 
-The patch preserves target-compatible reasoning and binds each routed request to its actual model and session. Codex owns native compaction and also produces a readable summary for switching providers. That summary requires an additional model request and consumes tokens. A failed summary cancels compaction instead of discarding context. An encrypted-only checkpoint blocks automatic provider switching until a successful `/compact` produces a readable summary. Pi records a system prompt update when, for example, the MCP server list changes mid-session; replay keeps these updates where they are in the history and checks them against the session like any other item.
+The patch preserves target-compatible reasoning and binds each routed request to its actual model and session. Billion-context owns automatic context compression. The compatibility entrypoint registers the Codex provider and automatic routing without registering native checkpoint creation or its additional summary request. The original compaction implementation remains available to synthetic upstream tests, but the entrypoint does not activate it.
+
+Existing encrypted checkpoints retain their replay validation. Billion-context can change the outgoing history, so an old checkpoint may still produce `expected-pi-replay-mismatch`. Preserve that session and start a new one after restarting Pi. Do not disable replay validation or discard the checkpoint to force an old session through. Pi records system prompt updates, including MCP changes, and legacy replay checks those updates in their original positions.
 
 After applying changes, restart Pi. Existing session files are not rewritten or deleted. If a session still fails replay validation, preserve it and start a new session; never bypass the parity check.
 
@@ -20,7 +22,7 @@ If no model fits, Auto reports a context overflow to Pi. With automatic compacti
 
 ## Paging and Ponytail
 
-`@rochecompaan/pi-context-paging@0.3.11` remains installed but its extension and `contextPaging.enabled` are disabled. A regression test demonstrates that trimming history after a native Codex checkpoint produces `expected-pi-replay-mismatch`. Do not enable paging with this native replay implementation.
+`@rochecompaan/pi-context-paging@0.3.11` remains installed but its extension and `contextPaging.enabled` are disabled. Billion-context manages compression, so keep paging disabled. A regression test also demonstrates that trimming history after an existing native Codex checkpoint produces `expected-pi-replay-mismatch`.
 
 Ponytail is pinned to `0.1.2`. `ai/pi/ponytail.json` sets its default to `off` on both platforms. Use `/ponytail lite` for an explicit session choice. An explicit `PONYTAIL_DEFAULT_MODE` environment variable still takes precedence.
 
