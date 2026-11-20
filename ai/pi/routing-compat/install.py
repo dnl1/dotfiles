@@ -13,7 +13,7 @@ import time
 
 PINS = {"pi-auto-model": "0.9.2", "pi-codex-native": "0.3.13"}
 RUNTIME_DEPS = ("partial-json", "proxy-from-env", "undici")
-ASSETS = ("package.json", "entry.ts", "dispatch-context.ts", "compat.patch", "patch-manifest.json", "test",
+ASSETS = ("package.json", "entry.ts", "dispatch-context.ts", "compat.patch", "capacity.patch", "patch-manifest.json", "test",
           "README.md", "NOTICE", "LICENSE.pi-auto-model", "LICENSE.pi-codex-native")
 
 
@@ -85,8 +85,9 @@ def install(agent_dir, source=None, host_modules=None):
                 shutil.copy2(path, stage / asset)
         for name in PINS:
             shutil.copytree(npm / name, stage / "vendor" / name)
-        subprocess.run(["patch", "--batch", "--forward", "-p1", "-i", str(source / "compat.patch")],
-                       cwd=stage, check=True, capture_output=True, text=True)
+        for name in ("compat.patch", "capacity.patch"):
+            subprocess.run(["patch", "--batch", "--forward", "-p1", "-i", str(source / name)],
+                           cwd=stage, check=True, capture_output=True, text=True)
         for relative, expected in manifest.items():
             if digest(stage / relative) != expected["patched_sha256"]:
                 raise RuntimeError(f"Patched hash mismatch: {relative}")

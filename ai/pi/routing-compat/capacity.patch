@@ -1,0 +1,267 @@
+--- a/vendor/pi-auto-model/extensions/auto-model.ts
++++ b/vendor/pi-auto-model/extensions/auto-model.ts
+@@ -17,7 +17,7 @@
+ 	SessionStartEvent,
+ } from "@earendil-works/pi-coding-agent";
+ import type { Model } from "@earendil-works/pi-ai";
+-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
++import { estimateTokens, type ModelRegistry } from "@earendil-works/pi-coding-agent";
+ import { randomUUID } from "node:crypto";
+ import { filterNativeCompactionContextMessages } from "../../pi-codex-native/src/compaction/payload-rewrite.ts";
+ import { join } from "node:path";
+@@ -161,7 +161,8 @@
+  */
+ function contextTokensOf(ctx: ExtensionContext): number {
+ 	if (!contextHasContextUsage(ctx)) return 0;
+-	return ctx.getContextUsage()?.tokens ?? 0;
++	return ctx.getContextUsage()?.tokens
++		?? ctx.sessionManager.buildSessionProjection().messages.reduce((total, message) => total + estimateTokens(message), 0);
+ }
+ 
+ function currentRouteId(state: SessionRuntimeState, ctx: ExtensionContext): string | undefined {
+@@ -323,6 +324,10 @@
+ 		getRegistry: () => modelRegistry,
+ 		circuits,
+ 		getPendingStream: pendingFor,
++		getContextTokens: (sessionId) => {
++			const ctx = activeContexts.get(sessionId);
++			return ctx ? contextTokensOf(ctx) : undefined;
++		},
+ 		adaptMessages: (messages, target) => target.provider === "openai-codex" && target.api === "openai-codex-responses"
+ 			? messages
+ 			: filterNativeCompactionContextMessages(messages as never) as typeof messages,
+@@ -345,7 +350,8 @@
+ 				const task = state.activeTask;
+ 				if (!task || task.requestId !== request.requestId) return "active task does not match this request";
+ 				const config = configs.get(state.sessionId) ?? DEFAULT_CONFIG;
+-				const inputTokens = Math.max(task.inputTokens ?? 0, requestContextTokens(context));
++				const ctx = activeContexts.get(request.sessionId);
++				const inputTokens = Math.max(task.inputTokens ?? 0, requestContextTokens(context, ctx ? contextTokensOf(ctx) : undefined));
+ 				const profile = { ...request.profile, constraints: {
+ 					...request.profile.constraints,
+ 					requiredContextTokens: inputTokens,
+@@ -668,6 +674,12 @@
+ 	pi.on("context", safeHandler<ContextEvent>("context", async (event, ctx) => {
+ 		const sessionId = ctx.sessionManager.getSessionId();
+ 		if (!runAwaitingRoute.delete(sessionId) || !isAutoModel(ctx.model)) return;
++		const state = store.get(sessionId);
++		if (state?.activeTask && state.cacheBoundary?.reason === "compaction") {
++			await applyAutoRoute({ prompt: latestPromptText(event.messages) }, ctx, state,
++				configs.get(sessionId) ?? DEFAULT_CONFIG, state.activeTask.requestId, false);
++			return;
++		}
+ 		await routeRun({ prompt: latestPromptText(event.messages) }, ctx, false);
+ 	}));
+ 
+@@ -756,14 +768,15 @@
+ 					}
+ 				: undefined;
+ 			const previousFailure = activeFailure ?? state.lastFailedRoute;
+-			// Parse inline prefix pin (@low/@medium/@high/@ultra/@model:...).
+-			const prefixPin: ReturnType<typeof parsePrefixPin> = allowPrefix ? parsePrefixPin(_event.prompt) : {
++			// Preserve the original task pin when replanning after compaction.
++			const prefixPin = state.activeTask?.prefixPin ?? (allowPrefix ? parsePrefixPin(_event.prompt) : {
+ 				strippedPrompt: _event.prompt,
+-			};
++			});
++			if (!preview && state.activeTask) state.activeTask.prefixPin = prefixPin;
+ 			const effectivePrompt = prefixPin.strippedPrompt;
+-			let classifierCostUsd = 0;
+-			let classifierAttempts = 0;
+-			let classifierUnknownCosts = 0;
++			let classifierCostUsd = state.activeTask?.budgetSpentUsd ?? 0;
++			let classifierAttempts = state.activeTask?.attemptCount ?? 0;
++			let classifierUnknownCosts = state.activeTask?.unknownCostAttempts ?? 0;
+ 			let profile = state.activeTask?.profile ?? analyzeTask({
+ 				prompt: effectivePrompt,
+ 				imageCount: _event.images?.length,
+@@ -882,7 +895,9 @@
+ 			const usePoolFallback = Boolean(
+ 				pool &&
+ 				pool.fallback === "any" &&
+-				(poolEligibleTargets.length === 0 || quotaEligibleTargets.length === 0) &&
++				(poolEligibleTargets.length === 0 || quotaEligibleTargets.length === 0 ||
++					quotaEligibleTargets.every(target => hardConstraintFailure(target, profile, contextTokensOf(ctx),
++						{ source: config.capabilitySource, overrides: config.benchmarkOverrides }, AUTO_MODEL_MAX_TOKENS) !== undefined)) &&
+ 				poolFallbackTargets.length > 0,
+ 			);
+ 			const healthyTargets = usePoolFallback
+@@ -1012,6 +1027,13 @@
+ 					`Pi Auto Model: no eligible model can satisfy this task's vision, context, or output requirements. Request blocked. ${failures.join("; ")}`,
+ 					"error",
+ 				);
++				if (!preview && poolTargets.length > 0 && poolTargets.every(target => hardConstraintFailure(
++					target, profile, contextTokensOf(ctx), { source: config.capabilitySource, overrides: config.benchmarkOverrides }, AUTO_MODEL_MAX_TOKENS,
++				)?.startsWith("context capacity"))) {
++					pendingStreams.set(state.sessionId, { targets: [], profile, thinking: "off", requestId,
++						sessionId: state.sessionId, estimatedCostUsd: 0, apisUsed: [],
++						blockedReason: `context_length_exceeded: no authenticated model fits. ${failures.join("; ")}` });
++				}
+ 				return { status: "blocked" };
+ 			}
+ 			const pinned = state.manualOverrides.pinnedTargetId
+@@ -1202,6 +1224,7 @@
+ 				routeTargetId: effectivePlan.target.id,
+ 				thinking,
+ 				profile,
++				prefixPin,
+ 				estimatedCostUsd: effectiveEstimate,
+ 				inputTokens: contextTokensOf(ctx),
+ 				budgetSpentUsd: classifierCostUsd,
+@@ -1598,21 +1621,6 @@
+ 		settleActiveTask(ctx, ctx.sessionManager.getSessionId());
+ 	}));
+ 
+-	// Pi < 0.85 has no agent_settled event. Defer the compatibility fallback
+-	// so newer Pi can emit agent_settled or begin an automatic retry first.
+-	pi.on("agent_end", safeHandler<AgentEndEvent>("agent_end", (_event, ctx) => {
+-		const sessionId = ctx.sessionManager.getSessionId();
+-		const requestId = store.get(sessionId)?.activeTask?.requestId;
+-		if (!requestId) return;
+-		setTimeout(() => {
+-			try {
+-				settleActiveTask(ctx, sessionId, requestId);
+-			} catch (error) {
+-				notifySafe(ctx, `Pi Auto Model agent_end settlement failed: ${errorMessage(error)}`);
+-			}
+-		}, 0);
+-	}));
+-
+ 	pi.on("message_update", safeHandler<MessageUpdateEvent>("message_update", (_event, ctx) => {
+ 		const state = store.get(ctx.sessionManager.getSessionId());
+ 		if (state?.activeTask) {
+@@ -1780,6 +1788,12 @@
+ 		const state = store.get(ctx.sessionManager.getSessionId());
+ 		if (state?.activation !== "active") return;
+ 		state.cacheBoundary = { at: Date.now(), reason: "compaction" };
++		if (event.willRetry && state.activeTask && isAutoModel(ctx.model)) {
++			state.activeTask.profile = undefined;
++			state.activeTask.inputTokens = undefined;
++			pendingStreams.delete(state.sessionId);
++			runAwaitingRoute.add(state.sessionId);
++		}
+ 	}));
+ 
+ 	pi.on(
+--- a/vendor/pi-auto-model/src/pi/request-context.ts
++++ b/vendor/pi-auto-model/src/pi/request-context.ts
+@@ -1,8 +1,7 @@
+ import type { Context } from "@earendil-works/pi-ai";
+ import { calculateContextTokens, estimateTokens } from "@earendil-works/pi-coding-agent";
+ 
+-/** Use Pi's usage-plus-trailing-message estimate, not serialized transcript size. */
+-export function requestContextTokens(context: Context): number {
++function messageContextTokens(context: Context): number {
+ 	let tokens = 0;
+ 	let start = 0;
+ 	for (let i = context.messages.length - 1; i >= 0; i--) {
+@@ -20,8 +19,13 @@
+ 			? estimateTokens(message)
+ 			: Math.max(estimateTokens(message), Math.ceil(JSON.stringify(message, (key, value) => key === "data" ? "" : value).length / 3));
+ 	}
++	return tokens;
++}
++
++/** Prefer Pi's projected count, which invalidates retained usage after compaction. */
++export function requestContextTokens(context: Context, projectedTokens?: number): number {
+ 	// ponytail: legacy Context keeps system/tools outside messages; retain conservative
+ 	// overhead even when prior usage includes it. Tokenizer-specific accounting can refine this.
+ 	const { messages: _messages, ...overhead } = context;
+-	return tokens + Math.ceil(JSON.stringify(overhead).length / 3);
++	return (projectedTokens ?? messageContextTokens(context)) + Math.ceil(JSON.stringify(overhead).length / 3);
+ }
+--- a/vendor/pi-auto-model/src/pi/stream-proxy.ts
++++ b/vendor/pi-auto-model/src/pi/stream-proxy.ts
+@@ -29,6 +29,8 @@
+ import type { CircuitBreaker } from "../health/circuit-breaker.ts";
+ import { classifyDetailedError } from "../health/provider-errors.ts";
+ import { AUTO_MODEL_MAX_TOKENS } from "./auto-model.ts";
++import { outputTokensForContext } from "../routing/route-planner.ts";
++import { requestContextTokens } from "./request-context.ts";
+ import { compatibilityAction, stripThinkingForRequest } from "../compat/guard.ts";
+ 
+ // ─── public types ───────────────────────────────────────────────
+@@ -39,6 +41,7 @@
+  */
+ export interface PendingStreamRequest {
+ 	targets: readonly RouteTarget[];
++	blockedReason?: string;
+ 	thinking: ThinkingLevel;
+ 	profile: TaskProfile;
+ 	requestId: string;
+@@ -84,6 +87,7 @@
+ 	adaptMessages?: (messages: Context["messages"], model: Model<Api>) => Context["messages"];
+ 	circuits: CircuitBreaker;
+ 	getPendingStream: (sessionId?: string) => PendingStreamRequest | undefined;
++	getContextTokens?: (sessionId: string) => number | undefined;
+ 	/** Called before a target is attempted. Return false or a reason string to skip it. */
+ 	beforeAttempt?: (target: RouteTarget, request: PendingStreamRequest, context: Context) => boolean | string | Promise<boolean | string>;
+ 	/** Called when an attempt's HTTP response arrives (for quota/circuit updates). */
+@@ -369,6 +373,10 @@
+ 	deps: StreamProxyDeps,
+ 	plan: PendingStreamRequest | undefined,
+ ): Promise<void> {
++	if (plan?.blockedReason) {
++		pushError(outer, plan.blockedReason);
++		return;
++	}
+ 	if (!plan?.targets.length) {
+ 		pushError(outer, "Pi Auto Model: no approved route plan available.");
+ 		return;
+@@ -400,11 +408,15 @@
+ 		if (!auth.ok) continue;
+ 		const probing = deps.circuits.getState(target.id) === "half-open";
+ 		if (probing && !deps.circuits.tryAcquireProbe(target.id)) continue;
++		const outputTokens = outputTokensForContext(target, plan.profile, requestContextTokens(context, deps.getContextTokens?.(plan.sessionId)), options?.maxTokens ?? AUTO_MODEL_MAX_TOKENS);
++		if (outputTokens < plan.profile.constraints.requiredOutputTokens) {
++			if (probing) deps.circuits.releaseProbe(target.id);
++			lastErrorText = `context_length_exceeded: ${target.id} cannot fit the current context and required output.`;
++			continue;
++		}
+ 		const pending = { ...plan, attemptId: randomUUID(), profile: { ...plan.profile, constraints: {
+ 			...plan.profile.constraints,
+-			// Reserve against the actual output allowance, not the task-size heuristic.
+-			// Capped like route planning so a target selected there is not rejected here.
+-			requiredOutputTokens: Math.min(options?.maxTokens ?? AUTO_MODEL_MAX_TOKENS, target.model.maxTokens),
++			requiredOutputTokens: outputTokens,
+ 		} } };
+ 		const allowed = await allowOnFailure(deps.beforeAttempt ? () => deps.beforeAttempt!(target, pending, context) : undefined);
+ 		if (options?.signal?.aborted) {
+--- a/vendor/pi-auto-model/src/routing/route-planner.ts
++++ b/vendor/pi-auto-model/src/routing/route-planner.ts
+@@ -251,6 +251,16 @@
+ 	return Math.max(0, 1 - shortfall / totalDemand - complexityPenalty - riskPenalty);
+ }
+ 
++export function outputTokensForContext(
++	target: RouteTarget,
++	profile: TaskProfile,
++	contextTokens: number,
++	outputTokenLimit = target.model.maxTokens,
++): number {
++	const input = Math.ceil(Math.max(contextTokens, profile.constraints.requiredContextTokens) * 1.15);
++	return Math.max(0, Math.min(outputTokenLimit, target.model.maxTokens, target.model.contextWindow - input));
++}
++
+ export function hardConstraintFailure(
+ 	target: RouteTarget,
+ 	profile: TaskProfile,
+@@ -266,7 +276,7 @@
+ 	}
+ 
+ 	const outputTokens = outputTokenLimit === undefined ? profile.constraints.requiredOutputTokens
+-		: Math.max(profile.constraints.requiredOutputTokens, Math.min(outputTokenLimit, target.model.maxTokens));
++		: Math.max(profile.constraints.requiredOutputTokens, outputTokensForContext(target, profile, contextTokens, outputTokenLimit));
+ 	if (target.model.maxTokens < outputTokens) return `output capacity requires ${outputTokens} tokens; available ${target.model.maxTokens}`;
+ 	const safetyAdjustedContext = Math.ceil(Math.max(contextTokens, profile.constraints.requiredContextTokens) * 1.15);
+ 	if (safetyAdjustedContext + outputTokens > target.model.contextWindow) {
+--- a/vendor/pi-auto-model/src/types.ts
++++ b/vendor/pi-auto-model/src/types.ts
+@@ -293,6 +293,7 @@
+ }
+ 
+ export interface TaskRoutingState {
++	prefixPin?: import("./task/prefix-parser.ts").PrefixPin;
+ 	requestId: string;
+ 	startedAt: number;
+ 	lastActivityAt: number;

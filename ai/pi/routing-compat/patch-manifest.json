@@ -5,7 +5,7 @@
   },
   "vendor/pi-auto-model/src/pi/stream-proxy.ts": {
     "original_sha256": "2ce63f960fbbd9559c907096ec17bde1e3905c69f5bc1e25aab2da1c0085310c",
-    "patched_sha256": "3206021cd5eb21b900fea3cfe83fea5519e2d478d50494ccfd21efac54b9913f"
+    "patched_sha256": "af79bbb514ab0f6b988501642f7e4c69864746c4b736061360d860ffae738d58"
   },
   "vendor/pi-auto-model/src/ui/commands.ts": {
     "original_sha256": "35923fb4244cdd9f60660d2a77b8dfd85b803874219ec6243d8281c348c305d4",
@@ -13,7 +13,7 @@
   },
   "vendor/pi-auto-model/extensions/auto-model.ts": {
     "original_sha256": "0d7138542c2d5cc6bdcb024e2db9a0ee0dc1f1141d6737387ccfb5b4b79387d6",
-    "patched_sha256": "f72e07e8cb832f5604185778bac02a415f7cb485b6bb6020cc18e02d2cf50545"
+    "patched_sha256": "100d129903e9e07b659e6fed8abacb0667490b54947c7c21932c7bb3b6e25e09"
   },
   "vendor/pi-auto-model/src/pi/auto-model.ts": {
     "original_sha256": "a3bb259c087fb8e7ff20b0fc7f01c2ecf0ef933e2c4297b2878db65af78e8064",
@@ -21,7 +21,7 @@
   },
   "vendor/pi-codex-native/src/compaction/extension.ts": {
     "original_sha256": "c605c414fea0d57da1c994d6c65ef70c9f8321c859a62fbfcf1109b918321b57",
-    "patched_sha256": "edc06da32d14d4fe7fc5a0101d8a297dcb51a83d911dcafd92aeb1bf93ba30f3"
+    "patched_sha256": "775d4a1c92c0db9fc9aa59ed3fd192231e14ad63c48b0ae3806acf2165a6c572"
   },
   "vendor/pi-codex-native/src/compaction/portable-summary.ts": {
     "original_sha256": "d47dfc57343e865803f29aa64895b8016e9c03ecd9ec40a61ae1bbd0f5c18925",
@@ -35,8 +35,16 @@
     "original_sha256": "4fe386b5b5e5fc2f51dbbe4de0b6f54b7b70ddb105489541b6c4675ba1cc8875",
     "patched_sha256": "f14641d4ba19431a7aac07aa6502e1fcfea2712624ed1f41c87fca9dd39baf79"
   },
-  "vendor/pi-codex-native/src/extension.ts": {
-    "original_sha256": "0b40630a3bcc6351830930799bccd9551db92bc26fad64fcee3bf3ac30fd4455",
-    "patched_sha256": "ece879bec86a57d13d77f262e2c88057a7b176d018f1facb66a60dc64985fd56"
+  "vendor/pi-auto-model/src/pi/request-context.ts": {
+    "original_sha256": "3e39716dc12d951e6130772ea458ed31e9408f15ff1aed0fa901a63e25f36bac",
+    "patched_sha256": "871a9fb8c2f2bc9a11d0e0c221da7084569dd067eef7e5f24357f9032a57a3bd"
+  },
+  "vendor/pi-auto-model/src/routing/route-planner.ts": {
+    "original_sha256": "e6fd41895f50245f20c3049469a7c3dab18e4aadfb9df6616fe6e8a825fcb9cc",
+    "patched_sha256": "06f9a463f12cf5a0358ef06340c7ad88ebbebafc36231669acf7e15d06622bcb"
+  },
+  "vendor/pi-auto-model/src/types.ts": {
+    "original_sha256": "39edbee86edd7ee904f90715ab1becfac3a76940511fa507d0313b4aa7652405",
+    "patched_sha256": "4babee7d12e194a0df0d65d4d887e7d8d41d3201d25c2db5baca91f26d79e484"
   }
 }

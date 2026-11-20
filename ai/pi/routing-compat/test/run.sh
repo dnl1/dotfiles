@@ -5,7 +5,7 @@ if [ ! -d test/fixtures/context-paging ]; then
   mkdir -p test/fixtures
   cp -R ../../npm/node_modules/@rochecompaan/pi-context-paging test/fixtures/context-paging
 fi
-tests=(./test/compat.test.ts ./test/history-replay.test.ts ./test/paging.test.ts ./test/compaction-owner.test.ts)
+tests=(./test/compat.test.ts ./test/history-replay.test.ts ./test/paging.test.ts)
 for file in vendor/pi-codex-native/test/*.test.ts; do
   case "$file" in
     */context-recovery.test.ts|*/hybrid-session.test.ts|*/developer-messages.test.ts) continue ;;

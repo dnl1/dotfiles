@@ -267,14 +267,27 @@
  				contextWindow: 1_000_000,
 --- a/vendor/pi-codex-native/src/compaction/extension.ts
 +++ b/vendor/pi-codex-native/src/compaction/extension.ts
-@@ -1,0 +2 @@
+@@ -1,4 +1,5 @@
+ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 +import { getDispatchModel } from "../../../../dispatch-context.ts";
-@@ -340,0 +342,4 @@
+ import { registerContextCheckpoint } from "../protocol/context-checkpoint.ts";
+ import { replayWindowCheckpoint } from "./window-checkpoint.ts";
+ import { portableSummary } from "./portable-summary.ts";
+@@ -338,6 +339,10 @@
+ 		portableCompaction && event.preparation
+ 			? await portableSummary({ ...event, preparation: event.preparation }, ctx)
+ 			: undefined;
 +	if (portableCompaction && (!portable?.summary.trim() || portable.summary.trim() === NATIVE_COMPACTION_SHIM_SUMMARY)) {
 +		notify(ctx, "Portable summary was empty; compaction was cancelled to preserve cross-provider history.");
 +		return { cancel: true };
 +	}
-@@ -422,0 +428,17 @@
+ 	const tools = activeTools(pi);
+ 	const context: Context = {
+ 		systemPrompt: built.request.instructions,
+@@ -420,6 +425,23 @@
+ 	}
+ }
+ 
 +function routedContext(ctx: ExtensionContext, payload?: unknown): ExtensionContext {
 +	if (ctx.model?.provider !== "pi-auto-model") return ctx;
 +	const id = ctx.sessionManager.getSessionId();
@@ -292,24 +305,44 @@
 +	return { ...ctx, model };
 +}
 +
-@@ -446,0 +469,2 @@
+ async function handleBeforeProviderRequest(
+ 	event: BeforeProviderRequestEvent,
+ 	ctx: ExtensionContext,
+@@ -444,6 +466,8 @@
+ 	const fallback = await injectPendingFallback(event.payload, ctx, hooks);
+ 	if (fallback) return fallback;
+ 	if (ctx.model?.provider !== "openai-codex" || ctx.model.api !== "openai-codex-responses") return undefined;
 +	if (isRecord(event.payload) && typeof event.payload.instructions === "string" &&
 +		event.payload.instructions.startsWith("You are a context summarization assistant.")) return;
-@@ -475,0 +500,6 @@
-+// Existing encrypted checkpoints still need their original replay contract.
-+// New compaction is owned by billion-context in the compatibility entrypoint.
-+export function registerNativeReplay(pi: ExtensionAPI, hooks?: NativeCompactionRuntimeHooks): void {
-+	pi.on("before_provider_request", (event, ctx) => handleBeforeProviderRequest(event, routedContext(ctx, event.payload), hooks));
-+}
-+
-@@ -479 +509 @@
+ 	const latest = resolveLatestNativeCompactionEntry(ctx.sessionManager.getBranch());
+ 	if (!latest.ok) return undefined;
+ 	const resolution = await resolveNativeCompactionEnvironment(ctx, hooks, event.payload);
+@@ -476,7 +500,7 @@
+ export default function registerNativeCompaction(
+ 	pi: ExtensionAPI,
+ 	hooks?: NativeCompactionRuntimeHooks,
 -	getSettings: () => CodexNativeSettings = getCodexNativeSettings,
 +	getSettings: () => CodexNativeSettings = () => ({ ...getCodexNativeSettings(), portableCompaction: true }),
-@@ -495,0 +526 @@
+ ): void {
+ 	const sessions = new Set<string>();
+ 	const bind = (ctx: ExtensionContext) => {
+@@ -493,6 +517,7 @@
+ 		return JSON.stringify(result.compaction.details);
+ 	});
+ 	pi.on("session_before_compact", async (event, ctx) => {
 +		ctx = routedContext(ctx);
-@@ -522 +553 @@
+ 		if (ctx.model?.provider === "openai-codex")
+ 			pi.events.emit("pi-codex-native/compaction/v1", {
+ 				version: 1,
+@@ -519,7 +544,7 @@
+ 			return { cancel: true };
+ 		}
+ 	});
 -	pi.on("before_provider_request", (event, ctx) => handleBeforeProviderRequest(event, ctx, hooks));
-+	registerNativeReplay(pi, hooks);
++	pi.on("before_provider_request", (event, ctx) => handleBeforeProviderRequest(event, routedContext(ctx, event.payload), hooks));
+ 	pi.on("session_compact", (_event, ctx) => {
+ 		pendingFallbacks.delete(ctx.sessionManager);
+ 	});
 --- a/vendor/pi-codex-native/src/compaction/portable-summary.ts
 +++ b/vendor/pi-codex-native/src/compaction/portable-summary.ts
 @@ -1,10 +1,14 @@
@@ -451,11 +484,3 @@
  	const freshPreambleCount = freshPreamble.leadingInput.length;
  	const trailingPreambleCount = freshPreamble.trailingInput.length;
  	const actualHistoryEnd = args.payload.input.length - trailingPreambleCount;
---- a/vendor/pi-codex-native/src/extension.ts
-+++ b/vendor/pi-codex-native/src/extension.ts
-@@ -5 +5 @@
--import registerNativeCompaction from "./compaction/index.ts";
-+import { registerNativeReplay } from "./compaction/extension.ts";
-@@ -101 +101 @@
--	registerNativeCompaction(pi, {
-+	registerNativeReplay(pi, {

@@ -18,7 +18,7 @@ async function realSession({ rotation, solFails, auto = false, failAllClaude = f
   process.env.CLAUDE_CONFIG_DIR = work;
   mkdirSync(join(dir, "npm/node_modules"), { recursive: true });
   const bridgeRoot = join(homedir(), ".pi/agent/npm/node_modules/pi-claude-bridge");
-  const routerRoot = join(homedir(), ".pi/agent/packages/pi-routing-compat/vendor/pi-auto-model");
+  const routerRoot = join(process.env.PI_ROUTING_PACKAGE ?? join(homedir(), ".pi/agent/packages/pi-routing-compat"), "vendor/pi-auto-model");
   const installRoot = join(homedir(), ".pi/agent/install");
   if (auto) {
     process.env.HOME = dir;
