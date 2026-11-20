@@ -21,7 +21,7 @@
   },
   "vendor/pi-codex-native/src/compaction/extension.ts": {
     "original_sha256": "c605c414fea0d57da1c994d6c65ef70c9f8321c859a62fbfcf1109b918321b57",
-    "patched_sha256": "775d4a1c92c0db9fc9aa59ed3fd192231e14ad63c48b0ae3806acf2165a6c572"
+    "patched_sha256": "edc06da32d14d4fe7fc5a0101d8a297dcb51a83d911dcafd92aeb1bf93ba30f3"
   },
   "vendor/pi-codex-native/src/compaction/portable-summary.ts": {
     "original_sha256": "d47dfc57343e865803f29aa64895b8016e9c03ecd9ec40a61ae1bbd0f5c18925",
@@ -34,5 +34,9 @@
   "vendor/pi-codex-native/src/compaction/payload-rewrite.ts": {
     "original_sha256": "4fe386b5b5e5fc2f51dbbe4de0b6f54b7b70ddb105489541b6c4675ba1cc8875",
     "patched_sha256": "f14641d4ba19431a7aac07aa6502e1fcfea2712624ed1f41c87fca9dd39baf79"
+  },
+  "vendor/pi-codex-native/src/extension.ts": {
+    "original_sha256": "0b40630a3bcc6351830930799bccd9551db92bc26fad64fcee3bf3ac30fd4455",
+    "patched_sha256": "ece879bec86a57d13d77f262e2c88057a7b176d018f1facb66a60dc64985fd56"
   }
 }
