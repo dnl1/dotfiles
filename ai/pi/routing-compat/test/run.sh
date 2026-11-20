@@ -12,5 +12,5 @@ for file in vendor/pi-codex-native/test/*.test.ts; do
   esac
   tests+=("./$file")
 done
-bun test --only-failures "${tests[@]}" --test-name-pattern '^(?!executes the local Rust)'
+bun test --preload ./test/pi-ai-view.ts --only-failures "${tests[@]}" --test-name-pattern '^(?!executes the local Rust)'
 bun ./test/sdk-smoke.ts

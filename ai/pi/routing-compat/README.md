@@ -28,7 +28,7 @@ Ponytail is pinned to `0.1.2`. `ai/pi/ponytail.json` sets its default to `off` o
 
 ## Tests
 
-Run the generated package's tests in an isolated HOME without network access or credentials, using Bun 1.3.14, the pinned npm packages and Pi 1.4.0 modules:
+Run the generated package's tests in an isolated HOME without network access or credentials, using Bun 1.3.14, the pinned npm packages and Pi 1.4.0 or 1.5.x modules:
 
 ```sh
 python3 ai/pi/routing-compat/install.py /scratch/agent --host-modules /host/node_modules
@@ -37,6 +37,8 @@ PI_TEST_NPM=/npm python3 -m unittest discover -s tests -p test_pi_sync.py -v
 ```
 
 The suite uses synthetic JSON roundtrips, dummy authentication, intercepted SSE responses and an in-memory SDK session. It needs no `PI_SESSION_FILE`, captured IDs or paid inference. It also tests failover boundaries, cross-provider summaries, package rebuilds, preservation of local settings and package filters.
+
+Pi 1.5's `pi-ai` no longer exports TypeBox's `Type`; its extension loader aliases `@earendil-works/pi-ai` to an extension view that adds it. `test/pi-ai-view.ts`, preloaded by `run.sh`, rewrites that import in the package's TypeScript to the same view when the host modules provide it. Pi 1.4 modules need no rewrite.
 
 Three upstream test files remain excluded because they require the separate Context Windows or Skills packages. One Rust-binary execution case is filtered out. These dependencies are not installed by this compatibility package.
 
