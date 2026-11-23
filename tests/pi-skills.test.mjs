@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -7,7 +8,10 @@ import test from "node:test";
 
 const sourceDir = fileURLToPath(new URL("../ai/claude/skills/", import.meta.url));
 const piDir = fileURLToPath(new URL("../ai/pi/", import.meta.url));
-const names = ["codebase-design", "diagnosing-bugs", "grilling", "tdd", "writing-pull-requests"];
+const adopted = ["codebase-design", "diagnosing-bugs", "grilling", "tdd", "writing-pull-requests"];
+// Copied unchanged from upstream; UPSTREAM.txt records the source and a content digest.
+const vendored = ["security-audit"];
+const names = [...adopted, ...vendored];
 const englishExamples = {
   "codebase-design": "rethink this architecture",
   "diagnosing-bugs": "investigate this error",
@@ -26,7 +30,7 @@ try {
   sdkUnavailable = "Pi SDK unavailable: " + error.message;
 }
 
-for (const name of names) {
+for (const name of adopted) {
   test(`${name} has valid, automatic, bounded metadata in the real Pi parser`, { skip: sdkUnavailable }, () => {
     const result = sdk.loadSkillsFromDir({ dir: join(sourceDir, name), source: "user" });
     assert.deepEqual(result.diagnostics, []);
@@ -37,6 +41,30 @@ for (const name of names) {
     assert(skill.description.length <= 1024);
     assert.match(skill.description, /Not for/);
     assert(skill.description.includes(englishExamples[name]));
+  });
+}
+
+for (const name of vendored) {
+  test(`${name} loads automatically in the real Pi parser`, { skip: sdkUnavailable }, () => {
+    const result = sdk.loadSkillsFromDir({ dir: join(sourceDir, name), source: "user" });
+    assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.skills.length, 1);
+    assert.equal(result.skills[0].name, name);
+    assert.equal(result.skills[0].disableModelInvocation, false);
+    assert(result.skills[0].description.length <= 1024);
+  });
+
+  test(`${name} still matches the upstream copy recorded in UPSTREAM.txt`, () => {
+    const dir = join(sourceDir, name);
+    const recorded = readFileSync(join(dir, "UPSTREAM.txt"), "utf8").match(/^Content digest: ([0-9a-f]{64})$/m)?.[1];
+    assert(recorded, "UPSTREAM.txt has no content digest");
+    // Same as: find . -type f ! -name UPSTREAM.txt | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256
+    const files = readdirSync(dir, { recursive: true, withFileTypes: true })
+      .filter(entry => entry.isFile() && !(entry.name === "UPSTREAM.txt" && entry.parentPath === dir))
+      .map(entry => "./" + join(entry.parentPath, entry.name).slice(dir.length + 1))
+      .sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
+    const listing = files.map(file => `${createHash("sha256").update(readFileSync(join(dir, file))).digest("hex")}  ${file}\n`).join("");
+    assert.equal(createHash("sha256").update(listing).digest("hex"), recorded);
   });
 }
 
@@ -100,7 +128,7 @@ test("local Markdown references in the adopted skill instructions exist", () => 
 
 test("manual routing cases are well formed, including near misses", () => {
   const cases = JSON.parse(readFileSync(join(piDir, "skill-routing-cases.json"), "utf8"));
-  assert.equal(cases.length, 20);
+  assert.equal(cases.length, 21);
   assert.equal(new Set(cases.map(item => item.id)).size, cases.length);
   for (const item of cases) {
     assert(item.prompt.length > 40);

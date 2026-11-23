@@ -62,7 +62,9 @@ opt-in in public clones (see [Auto-sync](#auto-sync)).
 
 Pi chooses skills from their descriptions; no separate router or model call is configured. `pi/AGENTS.md` distinguishes debugging from test-first work, visual design from module design, and accessibility from ordinary API work. The skill descriptions use English examples and explicit exclusions. Existing command names, profile keys and multilingual test fixtures keep their original spelling for compatibility and coverage. `frontend-design` loads from the existing official marketplace checkout, which also works on WSL without the Mac's symlink. Impeccable remains optional; machines without it use frontend-design.
 
-Run `node --test tests/pi-skills.test.mjs` to validate metadata and discovery with the installed Pi SDK. `pi/skill-routing-cases.json` contains 20 prompts and expected routes for manual checks after `/reload`; the offline tests do not measure model selection accuracy. Managed plugin and ai-memory descriptions are not rewritten. Changes to ordinary skills still require `/reload` in an active session.
+`security-audit` is Cloudflare's [security-audit-skill](https://github.com/cloudflare/security-audit-skill), copied unchanged with its MIT license. `claude/skills/security-audit/UPSTREAM.txt` records the commit and a content digest, and the tests fail if a file drifts from it. To update, replace every file with a reviewed upstream commit and refresh `UPSTREAM.txt`. A repository that keeps its own copy under `.agents/skills` loads both, and Pi keeps the first one it finds.
+
+Run `node --test tests/pi-skills.test.mjs` to validate metadata and discovery with the installed Pi SDK. `pi/skill-routing-cases.json` contains 21 prompts and expected routes for manual checks after `/reload`; the offline tests do not measure model selection accuracy. Managed plugin and ai-memory descriptions are not rewritten. Changes to ordinary skills still require `/reload` in an active session.
 
 ### ub-mode
 

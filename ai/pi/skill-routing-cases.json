@@ -115,6 +115,12 @@
     "avoid": ["ai-memory-durable-pages", "ai-memory-learning-maintenance"]
   },
   {
+    "id": "focused-security-review",
+    "prompt": "Revise se o webhook de pagamento confere a assinatura antes de confirmar o pedido. Quero saber se alguém consegue forjar a notificação.",
+    "expected": ["security-audit"],
+    "avoid": ["stark-backend", "diagnosing-bugs"]
+  },
+  {
     "id": "pdf-file-task",
     "prompt": "Junte os dois PDFs que estão na pasta Downloads e mantenha a ordem das páginas. Quero um único PDF de saída.",
     "expected": ["pdf"],

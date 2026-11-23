@@ -1,0 +1,7 @@
+Source: https://github.com/cloudflare/security-audit-skill
+Commit: c1c8a8c1471069fb0e188eeaff69b8e8db6564a8
+Path: skills/security-audit (copied unchanged), plus the repository LICENSE (MIT)
+Content digest: e9a1884cf6ce5dd79cf64ee0ad1057ff650ac465093691b3f21a549f94ccafc4
+  (shasum -a 256 of every file except UPSTREAM.txt, sorted by path with LC_ALL=C, then shasum -a 256 of that list)
+Verified: 2026-11-22 against the GitHub tarball of that commit; it was still the latest commit.
+Update only by replacing every file with a newly reviewed upstream commit, then refresh this file.

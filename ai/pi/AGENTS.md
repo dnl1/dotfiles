@@ -30,6 +30,7 @@ Choose skills by the user's intent and conversation context, in Portuguese or En
 - Unknown bug or performance regression: `diagnosing-bugs`. Test-first implementation or writing integration tests: `tdd`. Running existing tests alone needs neither workflow.
 - Module interfaces, dependency seams or structural refactoring: `codebase-design`. Use `grilling` only when the user explicitly wants an interview or their assumptions challenged.
 - Visual UI work: `impeccable` when available, otherwise `frontend-design`. Choose one design workflow. For a focused accessibility issue, use the applicable Stark skill (web, backend, mobile, Figma/design or program management). Mentioning "API", "backend" or "audit" alone does not make a task an accessibility request.
+- Security questions, focused security reviews, vulnerability research or pen tests: `security-audit`. Run its full audit workflow and write report files only when the user asks for a full audit, a pen test or a report.
 - PR titles and descriptions: `writing-pull-requests`, followed by `humanizer`. Reviewing a PR's code alone is not a PR-writing task. Keep the writing rules above for ordinary replies.
 - Honor a requested file format with its file skill. Use `docs` or `google-workspace` when the requested document workflow has the required connector available; do not invent connector calls. A repository README, agent instruction file or code comment is not a request to create an office document.
 
